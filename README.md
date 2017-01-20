@@ -1,6 +1,8 @@
 EventML
 =======
 
+To install EventML, please look at the `INSTALL` file.
+
 This repository contains EventML's implementation including:
 
 - EventML's sources in `sources` and `terms`.

@@ -1,0 +1,8 @@
+To start an erlang interactive session, run erl in a shell.
+
+To compile the project run: make:all([load]).  This is going to use
+the file named Emakefile which contains the list of modules of the
+project.
+
+One can run, e.g., evaluator1:test(), which calls the evaluator on a
+bunch of terms.

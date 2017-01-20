@@ -1,0 +1,235 @@
+specification nysiad
+options mono
+
+(* ====== parameters ====== *)
+
+parameter M, deqM : Type * M Deq
+parameter OriginalProtocol : (Int * Loc * Msg) Class
+parameter actors : Loc Bag
+parameter senders : Loc Bag (* oarcast senders *)
+
+parameter msg2m : Msg -> M
+
+parameter addwaitinghdr : Tok List
+parameter fromOARcasthdr : Tok List
+parameter deliverhdr : Tok List
+parameter validator2queuehdr : Tok List
+parameter simulation2validatorhdr : Tok List
+parameter fromClienthdr : Tok List
+parameter toOARcasthdr : Tok List
+parameter toClienthdr : Tok List
+
+[map] waitingmap : Loc , M
+
+(* ====== imports ====== *)
+
+import null hd tl outl outr deq-member bag-deq-member
+       product-deq union-deq id-deq unit-deq
+       remove-first isr bag-append
+
+(* ====== types ====== *)
+
+type tag = Tok
+(* a-message: data/source/destination,
+   the source is an inl or inr, where inl is for internal messages
+   and inr for external messages  *)
+type IoE = Unit + Unit
+type Amessage = Msg * IoE * Loc
+type OutputFromSimulation = M * Loc
+type DirectedMessage = Loc * Msg
+type Seq = Int
+
+(* ====== interface ====== *)
+
+(* Messges sent by the message bag handler to the queues
+   to unqueue *)
+internal validator2queue, validator2queuehdr : Loc
+
+(* Sent by the interface to OriginalProtocol to the message bag handler
+   to store messages in the bag *)
+internal simulation2validator, simulation2validatorhdr : Loc * Msg
+
+(* Messages from queues to the message bag handler to
+   wait for the same input from the corresponding replica *)
+internal addwaiting, addwaitinghdr : Amessage
+
+(* These are the message that the local simulation of OriginalProtocol
+   takes in.  By using "Local" each copy of OriginalProtocol will get
+   the messages that are sent to it. *)
+internal deliver, deliverhdr : DirectedMessage
+
+(* Inputs to the system from clients *)
+input fromClient, fromClienthdr : Msg
+
+(* Messages that oarcast takes as input *)
+output toOARcast, toOARcasthdr : Amessage
+
+(* Delivery from coordinators to coordinators,
+   messages sent by oarcast *)
+input fromOARcast, fromOARcasthdr : Loc * (Seq * Amessage)
+
+(* Message to clients *)
+output toClient, toClienthdr : Msg
+
+
+(* ====== variables ====== *)
+
+variable slf loc : Loc
+variable msg : Msg
+variable msgs : OutputFromSimulation List
+variable src : IoE
+
+(* ====== classes ====== *)
+
+(* -- validator -- *)
+
+let OutputFromSimulation-deq : OutputFromSimulation Deq =
+   product-deq ::M ::Loc deqM id-deq;;
+
+
+(* waiting on the head of the queue for l to be in the bag
+ * to deliver it to the l-replica
+ *)
+let addwaiting_transition slf (msg,src,d) (msgs,w) =
+  if isl src
+  then let m = msg2m msg in
+       if deq-member OutputFromSimulation-deq (m,d) msgs
+       then (remove-first (\x. x = (m,d)) msgs,w)
+       else (msgs,waitingmap'add d m w)
+  else (msgs,w) ;;
+
+let simulation2validator_transition slf (d,msg) (msgs,w) =
+  let m = msg2m msg in
+  let f = waitingmap'find d w in
+  if isl f
+  then if outl f = m
+       then (msgs, waitingmap'remove d w)
+       else ((m,d) . msgs, w)
+  else ((m,d) . msgs, w) ;;
+
+class ValidatorState =
+  Memory(\slf.([],waitingmap'empty),
+         addwaiting_transition,
+         addwaiting'base,
+         simulation2validator_transition,
+         simulation2validator'base) ;;
+
+let addwaiting_output slf (m,src,d) (msgs,w) =
+  if isl src
+  then let f = waitingmap'find d w in
+       if isl f
+       then if outl f = msg2m m
+            then { validator2queue'send slf d }
+            else {}
+       else {}
+  else { validator2queue'send slf d } ;;
+
+let simulation2validator_output slf (d,m) (msgs,w) =
+  if d = slf
+  then toOARcast'broadcast senders (m,inl(),d)
+  else {} ;;
+
+let on_input_validator slf i s =
+  if isl i then addwaiting_output slf (outl i) s
+  else simulation2validator_output slf (outr i) s ;;
+
+class ValidatorInput =
+     ((\slf.\x.{inl x}) o addwaiting'base)
+  || ((\slf.\x.{inr x}) o simulation2validator'base) ;;
+
+class Validator =
+  on_input_validator o (ValidatorInput,ValidatorState) ;;
+
+(* -- replicas -- *)
+
+let oarcast2queue_transition loc slf (sender,(seq,(m,src,d))) queue =
+  if loc = d
+  then if null queue & isr src
+       then queue
+       else queue ++ [(m,src)]
+  else queue ;;
+
+let validator2queue_transition loc slf d queue =
+  if loc = d
+  then tl queue
+  else queue ;;
+
+class QueueState loc =
+  Memory(\slf.[],
+         oarcast2queue_transition loc,
+         fromOARcast'base,
+         validator2queue_transition loc,
+         validator2queue'base) ;;
+
+class InputQueue =
+     ((\slf.\x.{inl x}) o fromOARcast'base)
+  || ((\slf.\x.{inr x}) o validator2queue'base) ;;
+
+let oarcast2queue_output loc slf (sender,(seq,(m,src,d))) queue =
+  if loc = d
+  then if null queue
+       then if isl src
+            then {addwaiting'send slf (m,src,d)}
+            else {deliver'send slf (d,m)}
+       else {}
+  else {} ;;
+
+let validator2queue_output loc slf d queue =
+  if loc = d
+  then if null queue
+       then {}
+       else let (m',s') = hd queue in
+            let rest = if null (tl queue) then {}
+                       else let (m',s') = hd (tl queue) in
+                            {addwaiting'send slf (m',s',d)} in
+            bag-append {deliver'send slf (loc,m')} rest
+  else {} ;;
+
+let on_input_queue loc slf i s =
+  if isl i then oarcast2queue_output loc slf (outl i) s
+  else validator2queue_output loc slf (outr i) s ;;
+
+class Queue loc =
+  (on_input_queue loc) o (InputQueue,QueueState loc) ;;
+
+let Out slf (delay,dest,m) =
+  if bag-deq-member id-deq dest actors
+  then {simulation2validator''send delay slf (dest,m)}
+       (* We're putting in the delay now because we can put it
+          anywhere between the output from OriginalProtocol and the actual sending *)
+  else {toClient'sign dest m} ;;
+
+class Queues = Output(\slf.actors) >>= Queue ;;
+
+class LocalSimulation =
+  Output(\slf.actors) >>= (\loc.Local(OriginalProtocol,loc,deliverhdr));;
+
+(* -- message from external client -- *)
+
+let msg_from_client_output loc m =
+  toOARcast'broadcast senders (m,inr(),loc) ;;
+
+class MsgFromClient = msg_from_client_output o fromClient'base ;;
+
+(* -- main -- *)
+
+
+(*
+
+ The messages from clients go through OARcast before getting
+ in the queues.
+
+ The queues get messages from OARcast, they can either be external
+ or internal.  They have to be validated by the validator before
+ being passed to the local simulation of the original protocol.
+
+ An internal message is validated by the validator if it is the
+ head of a queue and is outputed by the local simulation.
+
+ External messages are validated immediately.
+
+*)
+main (MsgFromClient
+      || Queues
+      || Validator
+      || (Out o LocalSimulation)) @ actors

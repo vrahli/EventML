@@ -1,0 +1,59 @@
+specification chronos_inc
+
+parameter reps   : Loc Bag
+parameter ldrs   : Loc Bag
+parameter accpts : Loc Bag
+parameter locs   : Loc Bag
+
+parameter Op,  eq_Op  : Type * Op  Deq
+parameter Cid, eq_Cid : Type * Cid Deq
+
+parameter ldrs_uid    : Loc -> Int
+parameter flrs        : Int
+
+import product-deq id-deq union-deq list-deq atom-deq
+
+type TaggedCommand = (Cid * Tok List) + (Loc * Cid * Op)
+
+let tagged_cmd_deq =
+  union-deq (::(Cid * Tok List))
+            (::(Loc * Cid * Op))
+            (product-deq ::Cid ::(Tok List) eq_Cid (list-deq atom-deq))
+            (product-deq ::Loc
+                         (::(Cid * Op))
+                         (id-deq)
+                         (product-deq ::Cid ::Op eq_Cid eq_Op)) ;;
+
+include paxos-v11-part1
+  where propose           = ``pv11_p1 propose``
+    and decision          = ``decision``
+    and accpts            = accpts
+    and reps              = reps
+    and ldrs              = ldrs
+    and ldrs_uid          = ldrs_uid
+    and type Cmd          = TaggedCommand
+
+include robust-simple-consensus-v4
+  where propose           = ``rsc4 propose``
+    and notify            = ``decision``
+    and type Cmd          = TaggedCommand
+    and cmdeq             = tagged_cmd_deq
+    and coeff             = 2
+    and flrs              = flrs
+    and locs              = locs
+    and clients           = reps
+
+include paxos-v11
+  where reps                  = reps
+    and request               = ``request``
+    and swap                  = ``swap``
+    and pax_propose           = ``pv11_p1 propose``
+    and tt_propose            = ``rsc4 propose``
+    and decision              = ``decision``
+    and response              = ``response``
+    and ldrs                  = ldrs
+    and type Op               = Op
+    and type Cid              = Cid
+    and eq_Cid                = eq_Cid
+
+main rsc4_main || pv11_p1_main || chronos_main

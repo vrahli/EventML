@@ -1,0 +1,1611 @@
+(* Copyright 2011 Cornell University
+ * Copyright 2012 Cornell University
+ * Copyright 2013 Cornell University
+ *
+ *
+ * This file is part of EventML - a tool aiming at specifying
+ * distributed protocols in an ML like language.  It is an interface
+ * to the logic of events and is compiled into Nuprl.  It is written
+ * by the NUPRL group of Cornell University, Ithaca, NY.
+ *
+ * EventML is a free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * EventML is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with EventML.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *  o Authors:     Vincent Rahli
+ *  o Affiliation: Cornell University, NUPRL group
+ *  o Date:        20 May 2011
+ *  o File name:   ML.grm
+ *  o Description: .
+ *)
+
+
+structure A  = Ast
+structure R  = Reg
+structure F  = Infix
+structure PD = ParseDefs
+structure EH = ErrorHandler
+
+type 'a t  = unit -> 'a
+
+fun getRegion left right = R.getRegionList left right
+
+
+%%
+
+
+%name ML
+
+
+%term
+  LLIST
+| RLIST
+| COMMA
+| LPAREN
+| RPAREN
+| LBRACE
+| RBRACE
+| STAR
+| TYPEARROW
+| OF
+| CASE
+| WHILE
+| DO
+| PIPE
+| DARROW
+| EQUALOP
+| REC
+| AND
+| VAL
+| DATATYPE
+| FUN
+| LET
+| IN
+| END
+| FN
+| IF
+| THEN
+| ELSE
+| WILD
+| COLON
+| WILDCARD
+| SHARP
+| SEMICOLON
+| TYPE
+| RAISE
+| HANDLE
+| EXCEPTION
+| STRUCTURE
+| STRUCT
+| SEAL
+| SIGNATURE
+| FUNCTOR
+| SIG
+| AS
+| OPEN
+| INFIX
+| INFIXR
+| NONFIX
+| OVERLOAD
+| LOCAL
+| ABSTYPE
+| SHARING
+| WHERE
+| WITH
+| WITHTYPE
+| EQTYPE
+| INCLUDE
+| OP
+| ORELSE
+| ANDALSO
+| ID      of string
+| INID    of string
+| LONGID  of string
+| NUM     of string
+| TYPEVAR of string
+| INT     of string
+| WORD    of string
+| REAL    of string
+| STRING  of string
+| CHAR    of string
+| FILE    of string
+| QUOTE   of string
+| AQUOTE  of string
+| BQUOTE
+| EQUOTE  of string
+| STDEC
+| STSPEC
+| STUSE
+| STCBAS
+| STSBAS
+| STQUOTE
+| STTYPE
+| QQVALUE of string
+| STEND
+| EOF
+
+
+%nonterm
+  prog             of A.term t
+| ident            of A.term t
+| identid          of A.term t
+| identop          of A.term t
+| identop'         of A.term t
+| identseq'        of A.term list t
+| identseq         of A.term t
+| longtycon        of A.term t
+| longid           of A.term t
+| longid'          of A.term t
+| scon             of A.term t
+| tylab            of A.term t
+| tycon            of A.term t
+| typevar          of A.term t
+| tyvarseqcomma    of A.term list t
+| tyvarseq         of A.term t
+| typetuple        of A.term list t
+| consty           of A.term t
+| onetyrow         of A.term t
+| tyrow            of A.term list t
+| tyrowopt         of A.term list t
+| atty             of A.term t
+| types            of A.term t
+| tupty            of A.term t
+| typeseqcomma     of A.term list t
+| typeseq          of A.term t
+| conbind          of A.term t
+| conbindbar       of A.term list t
+| conbindseq       of A.term t
+| valbindcore      of A.term t
+| valbindcorelist  of A.term list t
+| valbindseq       of A.term t
+| valbind          of A.term t
+| datname          of A.term t
+| datbind          of A.term t
+| datbindseqand    of A.term list t
+| datbindseq       of A.term t
+| typbind          of A.term t
+| typbindseqand    of A.term list t
+| typbindseq       of A.term t
+| exbind           of A.term t
+| exbindseqand     of A.term list t
+| exbindseq        of A.term t
+| labatpat         of A.term t
+| labatpats        of A.term list t
+| fmatch           of A.term t
+| fmatchty         of A.term t
+| fmvalbindcore    of A.term t
+| fvalbindcorelist of A.term list t
+| fvalbindone      of A.term t
+| fvalbindonelist  of A.term list t
+| fvalbind         of A.term t
+| d_opt            of int
+| dec              of A.term t
+| dec'             of A.term t
+| decmc            of A.term list t
+| decs             of A.term t
+| atexptuple       of A.term list t
+| labexpseq        of A.term list t
+| explist          of A.term list t
+| neexplist        of A.term list t
+| seqexp           of A.term t
+| oneexprow        of A.term t
+| exprow           of A.term list t
+| exprowopt        of A.term list t
+| atexp            of A.term t
+| appexp           of (A.term t) F.tree list
+| infexp           of A.term t
+| exp              of A.term t
+| matchbar         of A.term list t
+| match            of A.term t
+| mrule            of A.term t
+| identty          of A.term t
+| atpattuple       of A.term list t
+| patlist          of A.term list t
+| nepatlist        of A.term list t
+| onepatrow        of A.term t
+| patrow           of A.term list t
+| patrowopt        of A.term list t
+| atpat            of A.term t
+| atpat'           of A.term t
+| pat              of A.term t
+| patsp            of A.term t
+| patcpx           of A.term t
+| apppat           of (A.term t) F.tree list
+| infpat           of A.term t
+
+
+%nonassoc WITHTYPE
+%right COMMA
+%right PIPE
+%right AND
+%right TYPEARROW
+%left  EQUALOP
+%left  STAR
+%right DARROW
+%left  DO
+%left  ELSE
+%left  RAISE
+%right HANDLE
+%right ORELSE
+%right ANDALSO
+%right AS
+%left  COLON
+
+
+%pos R.pos
+
+
+%eop EOF
+
+
+%noshift EOF
+
+
+%start prog
+
+
+%verbose
+
+
+%%
+
+
+prog :
+  decs
+    (fn () =>
+	let val decs = decs ()
+	in A.mk_term A.PROG_PROG "" [] [decs]
+	end)
+
+scon :
+  NUM
+    (fn () =>
+	let val reg = R.consReg NUMleft NUMright
+	in A.mk_term A.SCON_INT NUM [reg] []
+	end)
+| INT
+    (fn () =>
+	let val reg = R.consReg INTleft INTright
+	in A.mk_term A.SCON_INT INT [reg] []
+	end)
+| WORD
+    (fn () =>
+	let val reg = R.consReg WORDleft WORDright
+	in A.mk_term A.SCON_WORD WORD [reg] []
+	end)
+| REAL
+    (fn () =>
+	let val reg = R.consReg REALleft REALright
+	in A.mk_term A.SCON_REAL REAL [reg] []
+	end)
+| STRING
+    (fn () =>
+	let val reg = R.consReg STRINGleft STRINGright
+	in A.mk_term A.SCON_STRING STRING [reg] []
+	end)
+| CHAR
+    (fn () =>
+	let val reg = R.consReg CHARleft CHARright
+	in A.mk_term A.SCON_CHAR CHAR [reg] []
+	end)
+
+ident :
+  identid (identid)
+| identop (identop)
+
+identid :
+  ID
+    (fn () =>
+	let val reg = R.consReg IDleft IDright
+	in A.mk_term A.ID_VID ID [reg] []
+	end)
+| INID
+    (fn () =>
+	let val reg = R.consReg INIDleft INIDright
+	in A.mk_term A.ID_VID INID [reg] []
+	end)
+
+identop' :
+  STAR
+    (fn () =>
+	let val reg = R.consReg STARleft STARright
+	in A.mk_term A.ID_VID "*" [reg] []
+	end)
+
+identop :
+  STAR
+    (fn () =>
+	let val reg = R.consReg STARleft STARright
+	in A.mk_term A.ID_VID "*" [reg] []
+	end)
+| EQUALOP
+    (fn () =>
+	let val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_term A.ID_VID "=" [reg] []
+	end)
+
+longid :
+  ident
+    (fn () => ident ())
+| longid'
+    (longid')
+
+longid' :
+  LONGID
+    (fn () =>
+	let val reg = R.consReg LONGIDleft LONGIDright
+	in A.mk_term A.ID_LONGID LONGID [reg] []
+	end)
+
+tycon :
+  ID
+    (fn () =>
+	let val reg = R.consReg IDleft IDright
+	in A.mk_term A.ID_TYCON ID [reg] []
+	end)
+| INID
+    (fn () =>
+	let val reg = R.consReg INIDleft INIDright
+	in A.mk_term A.ID_TYCON INID [reg] []
+	end)
+
+tylab :
+  ID
+    (fn () =>
+	let val reg = R.consReg IDleft IDright
+	in A.mk_term A.TYLAB_LAB ID [reg] []
+	end)
+| NUM
+    (fn () =>
+	let val reg = R.consReg NUMleft NUMright
+	in A.mk_term A.TYLAB_LAB NUM [reg] []
+	end)
+| STAR
+    (fn () =>
+	let val reg = R.consReg STARleft STARright
+	in A.mk_term A.TYLAB_LAB "*" [reg] []
+	end)
+| EQUALOP
+    (fn () =>
+	let val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_term A.TYLAB_LAB "=" [reg] []
+	end)
+
+typevar :
+  TYPEVAR
+    (fn () =>
+	let val reg = R.consReg TYPEVARleft TYPEVARright
+	in A.mk_term A.TYPEVAR_VAR TYPEVAR [reg] []
+	end)
+
+tyvarseqcomma :
+  typevar
+    (fn () =>
+	let val tv = typevar ()
+	in [tv]
+	end)
+| typevar COMMA tyvarseqcomma
+    (fn () =>
+	let val tv = typevar ()
+	    val tvs = tyvarseqcomma ()
+	    val reg = R.consReg COMMAleft COMMAleft
+	in tv :: tvs
+	end)
+
+tyvarseq :
+  typevar
+    (fn () =>
+	let val tv = typevar ()
+	    val reg = R.consReg typevarleft typevarright
+	in A.mk_term A.TYPEVARSEQ_ONE "" [] [tv]
+	end)
+| LPAREN tyvarseqcomma RPAREN
+    (fn () =>
+	let val tvs = tyvarseqcomma ()
+	    val reg1 = R.consReg LPARENleft LPARENleft
+	    val reg2 = R.consReg RPARENleft RPARENleft
+	in A.mk_term A.TYPEVARSEQ_SEQ "" [reg1, reg2] tvs
+	end)
+
+types :
+  tupty
+    (tupty)
+| tupty TYPEARROW types
+    (fn () =>
+	let val t1 = tupty ()
+	    val t2 = types ()
+	    val reg = R.consReg TYPEARROWleft TYPEARROWright
+	in A.mk_term A.TYPE_ARROW "" [reg] [t1, t2]
+	end)
+
+tupty :
+  typetuple
+    (fn () =>
+	let val tys = typetuple ()
+	in A.mk_term A.TYPE_TUPLE "" [] tys
+	end)
+
+typetuple :
+  consty
+    (fn () =>
+	let val ty = consty ()
+	in [ty]
+	end)
+| consty STAR typetuple
+    (fn () =>
+	let val ty = consty ()
+	    val tys = typetuple ()
+	    val reg = R.consReg STARleft STARright
+	in ty :: tys
+	end)
+
+consty :
+  atty
+    (atty)
+| typeseq tycon
+    (fn () =>
+	let val tn = tycon ()
+	    val ts = typeseq ()
+	in A.mk_term A.TYPE_TYCON "" [] [tn, ts]
+	end)
+| tycon
+    (fn () =>
+	let val tn = tycon ()
+	    val ts = A.mk_term A.TYPESEQ_EM "" [] []
+	in A.mk_term A.TYPE_TYCON "" [] [tn, ts]
+	end)
+
+onetyrow :
+ tylab COLON types
+    (fn () =>
+	let val lab = tylab ()
+	    val ty = types ()
+	    val reg = R.consReg COLONleft COLONright
+	in A.mk_term A.TYPEROW_ROW "" [reg] [lab, ty]
+	end)
+
+tyrow :
+  onetyrow
+    (fn () =>
+	let val row = onetyrow ()
+	in [row]
+	end)
+| onetyrow COMMA tyrow
+    (fn () =>
+	let val row = onetyrow ()
+	    val rows = tyrow ()
+	    val reg = R.consReg COMMAleft COMMAright
+	in row :: rows
+	end)
+
+tyrowopt :
+    (fn () => [])
+| tyrow
+    (tyrow)
+
+atty :
+  typevar
+    (fn () =>
+	let val tyvar = typevar ()
+	in A.mk_term A.TYPE_VAR "" [] [tyvar]
+	end)
+| LBRACE tyrowopt RBRACE
+    (fn () =>
+	let val rows = tyrowopt ()
+	    val reg1 = R.consReg LBRACEleft LBRACEright
+	    val reg2 = R.consReg RBRACEleft RBRACEright
+	in A.mk_term A.TYPE_RECORD "" [reg1, reg2] rows
+	end)
+| LPAREN types RPAREN
+    (fn () =>
+	let val ty = types ()
+	    val reg1 = R.consReg LPARENleft LPARENleft
+	    val reg2 = R.consReg RPARENleft RPARENleft
+	in A.mk_term A.TYPE_PAREN "" [reg1, reg2] [ty]
+	end)
+
+typeseqcomma :
+  types COMMA types
+    (fn () =>
+	let val ty1 = types1 ()
+	    val ty2 = types2 ()
+	    val reg = R.consReg COMMAleft COMMAright
+	in [ty1, ty2]
+	end)
+| types COMMA typeseqcomma
+    (fn () =>
+	let val ty = types ()
+	    val tys = typeseqcomma ()
+	    val reg = R.consReg COMMAleft COMMAleft
+	in ty :: tys
+	end)
+
+typeseq :
+  consty
+    (fn () =>
+	let val ty = consty ()
+	in A.mk_term A.TYPESEQ_ONE "" [] [ty]
+	end)
+| LPAREN typeseqcomma RPAREN
+    (fn () =>
+	let val tys = typeseqcomma ()
+	    val reg1 = R.consReg LPARENleft LPARENleft
+	    val reg2 = R.consReg RPARENleft RPARENleft
+	in A.mk_term A.TYPESEQ_SEQ "" [reg1, reg2] tys
+	end)
+
+conbind :
+  ident
+    (fn () =>
+	let val id = ident ()
+	in A.mk_term A.CONBIND_ID "" [] [id]
+	end)
+| OP ident
+    (fn () =>
+	let val id = ident ()
+	    val reg = R.consReg OPleft OPright
+	in A.mk_term A.CONBIND_OP "" [reg] [id]
+	end)
+| ident OF types
+    (fn () =>
+	let val id = ident ()
+	    val ty = types ()
+	    val reg = R.consReg OFleft OFright
+	in A.mk_term A.CONBIND_OF "" [reg] [id, ty]
+	end)
+| OP ident OF types
+    (fn () =>
+	let val id = ident ()
+	    val ty = types ()
+	    val reg1 = R.consReg OPleft OPright
+	    val reg2 = R.consReg OFleft OFright
+	in A.mk_term A.CONBIND_OPOF "" [reg1, reg2] [id, ty]
+	end)
+
+conbindbar :
+  conbind
+    (fn () =>
+	let val cb = conbind ()
+	in [cb]
+	end)
+| conbind PIPE conbindbar
+    (fn () =>
+	let val cb = conbind ()
+	    val cbs = conbindbar ()
+	in cb :: cbs
+	end)
+
+conbindseq :
+  conbindbar
+    (fn () =>
+	let val cbs = conbindbar ()
+	in A.mk_term A.CONBINDSEQ_SEQ "" [] cbs
+	end)
+
+valbindcore :
+  pat EQUALOP exp
+    (fn () =>
+	let val pat = pat ()
+	    val exp = exp ()
+	    val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_term A.ONEVALBIND_EQ "" [reg] [pat, exp]
+	end)
+
+valbindcorelist :
+  valbindcore
+    (fn () =>
+	let val valbind = valbindcore ()
+	in [valbind]
+	end)
+| valbindcore AND valbindcorelist
+    (fn () =>
+	let val valbind = valbindcore ()
+	    val valbinds = valbindcorelist ()
+	    val reg = R.consReg ANDleft ANDleft
+	in valbind :: valbinds
+	end)
+
+valbind :
+  REC valbindcorelist
+  (fn () =>
+      let val valbinds = valbindcorelist ()
+	  val reg = R.consReg RECleft RECright
+      in A.mk_term A.VALBIND_REC "" [reg] valbinds
+      end)
+| valbindcorelist
+    (fn () =>
+	let val valbinds = valbindcorelist ()
+	in A.mk_term A.VALBIND_NREC "" [] valbinds
+	end)
+
+datname :
+  tyvarseq tycon
+    (fn () =>
+	let val tycon = tycon ()
+	    val tyvars = tyvarseq ()
+	in A.mk_term A.DATNAME_DAT "" [] [tycon, tyvars]
+	end)
+| tycon
+    (fn () =>
+	let val tycon = tycon ()
+	    val tyvars = A.mk_term A.TYPEVARSEQ_EM "" [] []
+	in A.mk_term A.DATNAME_DAT "" [] [tycon, tyvars]
+	end)
+
+datbind :
+  tyvarseq tycon EQUALOP conbindseq
+    (fn () =>
+	let val tycon = tycon ()
+	    val tyvars = tyvarseq ()
+	    val conbinds = conbindseq ()
+	    val reg = R.consReg EQUALOPleft EQUALOPright
+	    val datname = A.mk_term A.DATNAME_DAT "" [] [tycon, tyvars]
+	in A.mk_term A.ONEDATBIND_EQ "" [reg] [datname, conbinds]
+	end)
+| tycon EQUALOP conbindseq
+    (fn () =>
+	let val tycon = tycon ()
+	    val tyvars = A.mk_term A.TYPEVARSEQ_EM "" [] []
+	    val conbinds = conbindseq ()
+	    val reg = R.consReg EQUALOPleft EQUALOPright
+	    val datname = A.mk_term A.DATNAME_DAT "" [] [tycon, tyvars]
+	in A.mk_term A.ONEDATBIND_EQ "" [reg] [datname, conbinds]
+	end)
+
+datbindseqand :
+  datbind
+    (fn () =>
+	let val datbind = datbind ()
+	in [datbind]
+	end)
+| datbind AND datbindseqand
+    (fn () =>
+	let val datbind = datbind ()
+	    val datbinds = datbindseqand ()
+	    val reg = R.consReg ANDleft ANDleft
+	in datbind :: datbinds
+	end)
+
+datbindseq :
+  datbindseqand
+    (fn () =>
+	let val datbinds = datbindseqand ()
+	in A.mk_term A.DATBIND_BIND "" [] datbinds
+	end)
+
+labatpat :
+  identid
+    (fn () =>
+	let val id = identid ()
+	    val atpat = A.mk_term A.ATPAT_ID "" [] [id]
+	in A.mk_term A.FATPAT_PAT "" [] [atpat]
+	end)
+| identop'
+    (fn () =>
+	let val id = identop' ()
+	    val atpat = A.mk_term A.ATPAT_ID "" [] [id]
+	in A.mk_term A.FATPAT_PAT "" [] [atpat]
+	end)
+| atpat
+    (fn () =>
+	let val atpat = atpat ()
+	in A.mk_term A.FATPAT_PAT "" [] [atpat]
+	end)
+
+labatpats :
+  labatpat
+    (fn () =>
+	let val labatpat = labatpat ()
+	in [labatpat]
+	end)
+| labatpat labatpats
+    (fn () =>
+	let val labatpat = labatpat ()
+	    val labatpats = labatpats()
+	in labatpat :: labatpats
+	end)
+
+fmatch :
+  labatpats
+    (fn () =>
+	let val fatpats = labatpats ()
+	    fun cons []  = raise EH.DeadBranch ""
+	      | cons [x] = raise EH.DeadBranch ""
+	      | cons [x1, x2] =
+		A.mk_term A.FMATCH_ID "" [] [A.getIDinFATPAT x2, x1]
+	      | cons (x :: xs) =
+		let val u = cons xs
+		in A.mk_term A.FMATCH_APP "" [] [u, x]
+		end
+	in cons (List.rev fatpats)
+	end)
+
+fmatchty :
+  fmatch
+    (fn () =>
+	let val fmatch = fmatch ()
+	in A.mk_term A.FMATCHTY_FM "" [] [fmatch]
+	end)
+| fmatch COLON types
+    (fn () =>
+	let val fmatch = fmatch ()
+	    val ty = types ()
+	    val reg = R.consReg COLONleft COLONright
+	in A.mk_term A.FMATCHTY_TY "" [reg] [fmatch, ty]
+	end)
+
+fmvalbindcore :
+  fmatchty EQUALOP exp
+    (fn () =>
+	let val fmatchty = fmatchty ()
+	    val exp = exp ()
+	    val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_term A.BRANCHFVALBIND_BRANCH "" [reg] [fmatchty, exp]
+	end)
+
+fvalbindcorelist :
+  fmvalbindcore
+    (fn () =>
+	let val fvalbindcore = fmvalbindcore ()
+	in [fvalbindcore]
+	end)
+| fmvalbindcore PIPE fvalbindcorelist
+    (fn () =>
+	let val fvalbindcore = fmvalbindcore ()
+	    val fvalbindcores = fvalbindcorelist ()
+	    val reg = R.consReg PIPEleft PIPEleft
+	in fvalbindcore :: fvalbindcores
+	end)
+
+fvalbindone :
+  fvalbindcorelist
+    (fn () =>
+	let val fvalbindcores = fvalbindcorelist ()
+	in A.mk_term A.ONEFVALBIND_BRANCHES "" [] fvalbindcores
+	end)
+
+fvalbindonelist :
+  fvalbindone
+    (fn () =>
+	let val fvalbind = fvalbindone ()
+	in [fvalbind]
+	end)
+| fvalbindone AND fvalbindonelist
+    (fn () =>
+	let val fvalbind = fvalbindone ()
+	    val fvalbinds = fvalbindonelist ()
+	    val reg = R.consReg ANDleft ANDleft
+	in fvalbind :: fvalbinds
+	end)
+
+fvalbind :
+ fvalbindonelist
+    (fn () =>
+	let val fvalbinds = fvalbindonelist ()
+	in A.mk_term A.FVALBIND_BIND "" [] fvalbinds
+	end)
+
+typbind :
+  datname EQUALOP types
+    (fn () =>
+	let val datname = datname ()
+	    val ty = types ()
+	    val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_term A.ONETYPBIND_EQ "" [reg] [datname, ty]
+	end)
+
+typbindseqand :
+  typbind
+    (fn () =>
+	let val typbind = typbind ()
+	in [typbind]
+	end)
+| typbind AND typbindseqand
+    (fn () =>
+	let val typbind = typbind ()
+	    val typbinds = typbindseqand ()
+	    val reg = R.consReg ANDleft ANDleft
+	in typbind :: typbinds
+	end)
+
+typbindseq :
+  typbindseqand
+    (fn () =>
+	let val typbinds = typbindseqand ()
+	in A.mk_term A.TYPBIND_BIND "" [] typbinds
+	end)
+
+exbind :
+  ident
+    (fn () =>
+	let val id = ident ()
+	in A.mk_term A.ONEEXBIND_ID "" [] [id]
+	end)
+| OP ident
+    (fn () =>
+	let val id = ident ()
+	in A.mk_term A.ONEEXBIND_ID "" [] [id]
+	end)
+| ident OF types
+    (fn () =>
+	let val id = ident ()
+	    val ty = types ()
+	    val reg = R.consReg OFleft OFright
+	in A.mk_term A.ONEEXBIND_OF "" [reg] [id, ty]
+	end)
+| OP ident OF types
+    (fn () =>
+	let val id = ident ()
+	    val ty = types ()
+	    val reg = R.consReg OFleft OFright
+	in A.mk_term A.ONEEXBIND_OF "" [reg] [id, ty]
+	end)
+| ident EQUALOP ident
+    (fn () =>
+	let val id1 = ident1 ()
+	    val id2 = ident2 ()
+	    val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_term A.ONEEXBIND_EQ "" [reg] [id1, id2]
+	end)
+| OP ident EQUALOP ident
+    (fn () =>
+	let val id1 = ident1 ()
+	    val id2 = ident2 ()
+	    val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_term A.ONEEXBIND_EQ "" [reg] [id1, id2]
+	end)
+| ident EQUALOP OP ident
+    (fn () =>
+	let val id1 = ident1 ()
+	    val id2 = ident2 ()
+	    val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_term A.ONEEXBIND_EQ "" [reg] [id1, id2]
+	end)
+| OP ident EQUALOP OP ident
+    (fn () =>
+	let val id1 = ident1 ()
+	    val id2 = ident2 ()
+	    val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_term A.ONEEXBIND_EQ "" [reg] [id1, id2]
+	end)
+
+exbindseqand :
+  exbind
+    (fn () => [exbind ()])
+| exbind AND exbindseqand
+    (fn () =>
+	let val exbind = exbind ()
+	    val exbinds = exbindseqand ()
+	    val reg = R.consReg ANDleft ANDleft
+	in exbind :: exbinds
+	end)
+
+exbindseq :
+  exbindseqand
+    (fn () =>
+	let val exbinds = exbindseqand ()
+	in A.mk_term A.EXBIND_BIND "" [] exbinds
+	end)
+
+dec :
+  dec' (dec')
+| LOCAL decs IN decs END
+    (fn () =>
+	let val decs1 = decs1 ()
+	    val decs2 = decs2 ()
+	    val reg1 = R.consReg LOCALleft LOCALright
+	    val reg2 = R.consReg INleft    INright
+	    val reg3 = R.consReg ENDleft   ENDright
+	in A.mk_term A.DEC_LOCAL "" [reg1, reg2, reg3] [decs1, decs2]
+	end)
+
+d_opt :
+  INT
+    (Option.valOf (Int.fromString INT)
+     handle Option   => raise EH.DeadBranch ""
+	  | Overflow => raise EH.DeadBranch "")
+| NUM
+    (Option.valOf (Int.fromString NUM)
+     handle Option   => raise EH.DeadBranch ""
+	  | Overflow => raise EH.DeadBranch "")
+|   (0)
+
+dec' :
+  VAL valbind
+    (fn () =>
+	let val tyvars = A.mk_term A.TYPEVARSEQ_EM "" [] []
+	    val reg = R.consReg VALleft VALright
+	    val bind = valbind ()
+	in A.mk_term A.DEC_VAL "" [reg] [tyvars, bind]
+	end)
+| VAL tyvarseq valbind
+    (fn () =>
+	let val tyvars = tyvarseq ()
+	    val bind = valbind ()
+	    val reg = R.consReg VALleft VALright
+	in A.mk_term A.DEC_VAL "" [reg] [tyvars, bind]
+	end)
+| DATATYPE datbindseq
+    (fn () =>
+	let val datbind = datbindseq ()
+	    val reg = R.consReg DATATYPEleft DATATYPEright
+	in A.mk_term A.DEC_DAT "" [reg] [datbind]
+	end)
+| DATATYPE datbindseq WITHTYPE typbindseq
+    (fn () =>
+	let val datbind = datbindseq ()
+	    val typbind = typbindseq ()
+	    val reg1 = R.consReg DATATYPEleft DATATYPEright
+	    val reg2 = R.consReg WITHTYPEleft WITHTYPEright
+	in A.mk_term A.DEC_DATWITH "" [reg1, reg2] [datbind, typbind]
+	end)
+| DATATYPE tycon EQUALOP DATATYPE tycon
+    (fn () =>
+	let val tycon1 = tycon1 ()
+	    val tycon2 = tycon2 ()
+	    val reg1 = R.consReg DATATYPE1left DATATYPE1right
+	    val reg2 = R.consReg EQUALOPleft   EQUALOPright
+	    val reg3 = R.consReg DATATYPE2left DATATYPE2right
+	in A.mk_term A.DEC_DATREP "" [reg1, reg2, reg3] [tycon1, tycon2]
+	end)
+| ABSTYPE datbindseq WITH decs END
+    (fn () =>
+	let val datbind = datbindseq ()
+	    val decs = decs ()
+	    val reg1 = R.consReg ABSTYPEleft ABSTYPEright
+	    val reg2 = R.consReg WITHleft    WITHright
+	    val reg3 = R.consReg ENDleft     ENDright
+	in A.mk_term A.DEC_ABSTYP "" [reg1, reg2, reg3] [datbind, decs]
+	end)
+| ABSTYPE datbindseq WITHTYPE typbindseq WITH decs END
+    (fn () =>
+	let val datbind = datbindseq ()
+	    val typbind = typbindseq ()
+	    val decs = decs ()
+	    val reg1 = R.consReg ABSTYPEleft  ABSTYPEright
+	    val reg2 = R.consReg WITHleft     WITHright
+	    val reg3 = R.consReg WITHTYPEleft WITHTYPEright
+	    val reg4 = R.consReg ENDleft      ENDright
+	in A.mk_term A.DEC_ABSWITH "" [reg1, reg2, reg3, reg4] [datbind, typbind, decs]
+	end)
+| FUN fvalbind
+    (fn () =>
+	let val tyvars = A.mk_term A.TYPEVARSEQ_EM "" [] []
+	    val reg = R.consReg FUNleft FUNright
+	    val fvalbind = fvalbind ()
+	in A.mk_term A.DEC_FVAL "" [reg] [tyvars, fvalbind]
+	end)
+| FUN tyvarseq fvalbind
+    (fn () =>
+	let val tyvars = tyvarseq ()
+	    val fvalbind = fvalbind ()
+	    val reg = R.consReg FUNleft FUNright
+	in A.mk_term A.DEC_FVAL "" [reg] [tyvars, fvalbind]
+	end)
+| TYPE typbindseq
+    (fn () =>
+	let val typbind = typbindseq ()
+	    val reg = R.consReg TYPEleft TYPEright
+	in A.mk_term A.DEC_TYP "" [reg] [typbind]
+	end)
+| EXCEPTION exbindseq
+    (fn () =>
+	let val exbind = exbindseq ()
+	    val reg = R.consReg EXCEPTIONleft EXCEPTIONright
+	in A.mk_term A.DEC_EXC "" [reg] [exbind]
+	end)
+
+decmc :
+    (fn () => [])
+| SEMICOLON decmc
+    (decmc)
+| dec decmc
+    (fn () =>
+	let val dec = dec ()
+	    val decs = decmc ()
+	in dec :: decs
+	end)
+
+decs :
+  decmc
+    (fn () =>
+	let val decs = decmc ()
+	in A.mk_term A.DECS_DECS "" [] decs
+	end)
+
+atexptuple :
+  exp COMMA exp
+    (fn () =>
+	let val exp1 = exp1 ()
+	    val exp2 = exp2 ()
+	    val reg = R.consReg COMMAleft COMMAleft
+	in [exp1, exp2]
+	end)
+| exp COMMA atexptuple
+    (fn () =>
+	let val exp = exp ()
+	    val exps = atexptuple ()
+	    val reg = R.consReg COMMAleft COMMAleft
+	in exp :: exps
+	end)
+
+labexpseq :
+  exp SEMICOLON exp
+    (fn () =>
+	let val exp1 = exp1 ()
+	    val exp2 = exp2 ()
+	    val reg = R.consReg SEMICOLONleft SEMICOLONright
+	in [exp1, exp2]
+	end)
+| exp SEMICOLON labexpseq
+    (fn () =>
+	let val exp = exp ()
+	    val exps = labexpseq ()
+	    val reg = R.consReg SEMICOLONleft SEMICOLONright
+	in exp :: exps
+	end)
+
+seqexp :
+  labexpseq
+    (fn () =>
+	let val exps = labexpseq ()
+	in A.mk_term A.EXPSEQ_SEQ "" [] exps
+	end)
+
+explist :
+    (fn () => [])
+| neexplist (neexplist)
+
+neexplist :
+  exp
+    (fn () =>
+	let val exp = exp ()
+	in [exp]
+	end)
+| exp COMMA neexplist
+    (fn () =>
+	let val exp = exp ()
+	    val exps = neexplist ()
+	    val reg = R.consReg COMMAleft COMMAleft
+	in exp :: exps
+	end)
+
+oneexprow :
+ tylab EQUALOP exp
+    (fn () =>
+	let val lab = tylab ()
+	    val exp = exp ()
+	    val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_term A.EXPROW_ROW "" [reg] [lab, exp]
+	end)
+
+exprow :
+  oneexprow
+    (fn () =>
+	let val row = oneexprow ()
+	in [row]
+	end)
+| oneexprow COMMA exprow
+    (fn () =>
+	let val row = oneexprow ()
+	    val rows = exprow ()
+	    val reg = R.consReg COMMAleft COMMAright
+	in row :: rows
+	end)
+
+exprowopt :
+    (fn () => [])
+| exprow
+    (exprow)
+
+atexp :
+  OP longid
+    (fn () =>
+	let val id = longid ()
+	in A.mk_term A.ATEXP_ID "" [] [id]
+	end)
+| scon
+    (fn () =>
+	let val sc = scon ()
+	in A.mk_term A.ATEXP_SCON "" [] [sc]
+	end)
+| SHARP tylab
+    (fn () =>
+	let val lab = tylab ()
+	    val reg = R.consReg SHARPleft SHARPright
+	in A.mk_term A.ATEXP_SEL "" [reg] [lab]
+	end)
+| LPAREN RPAREN
+    (fn () =>
+	let val reg = R.consReg LPARENleft RPARENright
+	in A.mk_term A.ATEXP_TUPLE "" [reg] []
+	end)
+| LPAREN atexptuple RPAREN
+    (fn () =>
+	let val exps = atexptuple ()
+	    val reg1 = R.consReg LPARENleft LPARENleft
+	    val reg2 = R.consReg RPARENleft RPARENleft
+	in A.mk_term A.ATEXP_TUPLE "" [reg1, reg2] exps
+	end)
+| LPAREN seqexp RPAREN
+    (fn () =>
+	let val seq = seqexp ()
+	    val reg1 = R.consReg LPARENleft LPARENright
+	    val reg2 = R.consReg RPARENleft RPARENright
+	in A.mk_term A.ATEXP_SEQ "" [reg1, reg2] [seq]
+	end)
+| LPAREN exp RPAREN
+    (fn () =>
+	let val exp = exp ()
+	    val reg1 = R.consReg LPARENleft LPARENleft
+	    val reg2 = R.consReg RPARENleft RPARENleft
+	in A.mk_term A.ATEXP_PAREN "" [reg1, reg2] [exp]
+	end)
+| LBRACE exprowopt RBRACE
+    (fn () =>
+	let val rows = exprowopt ()
+	    val reg1 = R.consReg LBRACEleft LBRACEright
+	    val reg2 = R.consReg RBRACEleft RBRACEright
+	in A.mk_term A.ATEXP_RECORD "" [reg1, reg2] rows
+	end)
+| LET decs IN exp END
+    (fn () =>
+	let val decs = decs ()
+	    val exp = exp ()
+	    val reg1 = R.consReg LETleft LETright
+	    val reg2 = R.consReg INleft  INright
+	    val reg3 = R.consReg ENDleft ENDright
+	in A.mk_term A.ATEXP_LET "" [reg1, reg2, reg3] [decs, exp]
+	end)
+| LET decs IN seqexp END
+    (fn () =>
+	let val decs = decs ()
+	    val seq = seqexp ()
+	    val reg1 = R.consReg LETleft LETright
+	    val reg2 = R.consReg INleft  INright
+	    val reg3 = R.consReg ENDleft ENDright
+	in A.mk_term A.ATEXP_SLET "" [reg1, reg2, reg3] [decs, seq]
+	end)
+| LLIST explist RLIST
+    (fn () =>
+	let val exps = explist ()
+	    val reg1 = R.consReg LLISTleft LLISTleft
+	    val reg2 = R.consReg RLISTleft RLISTleft
+	in A.mk_term A.ATEXP_LIST "" [reg1, reg2] exps
+	end)
+
+appexp :
+  ID
+    ([F.O (ID, [R.consReg IDleft IDright])])
+| INID
+    ([F.O (INID, [R.consReg INIDleft INIDright])])
+| EQUALOP
+    ([F.O ("=", [R.consReg EQUALOPleft EQUALOPright])])
+| STAR
+    ([F.O ("*", [R.consReg STARleft STARright])])
+| longid'
+    ([F.L (fn () => A.mk_term A.ATEXP_ID "" [] [longid' ()], [])])
+| atexp
+    ([F.L (atexp, [])])
+| ID appexp
+    ((F.O (ID, [R.consReg IDleft IDright])) :: appexp)
+| INID appexp
+    ((F.O (INID, [R.consReg INIDleft INIDright])) :: appexp)
+| EQUALOP appexp
+    ((F.O ("=", [R.consReg EQUALOPleft EQUALOPright])) :: appexp)
+| STAR appexp
+    ((F.O ("*", [R.consReg STARleft STARright])) :: appexp)
+| longid' appexp
+    ((F.L (fn () => A.mk_term A.ATEXP_ID "" [] [longid' ()], [])) :: appexp)
+| atexp appexp
+    ((F.L (atexp, [])) :: appexp)
+
+infexp :
+  appexp
+    (fn () =>
+	let fun cons2 (F.L (exp, _)) = exp ()
+	      | cons2 (F.O _) = raise EH.DeadBranch ""
+	      | cons2 (F.N ((st, r), t1, t2)) = cons1 (F.N ((st, r), t1, t2))
+
+	    and cons1 (F.L (exp, _)) = exp ()
+	      | cons1 (F.O _) = raise EH.DeadBranch ""
+	      | cons1 (F.N ((st, r), t1, t2)) =
+		let val e1 = cons2 t1
+		    val e2 = cons2 t2
+		in A.mk_term A.EXP_OP st [] [e1, e2]
+		end
+
+	    fun toAtExp (F.O (st, regs)) =
+		let val id = A.mk_term A.ID_VID st regs []
+		in fn () => A.mk_term A.ATEXP_ID "" [] [id]
+		end
+	      | toAtExp (F.L (atexp, _)) = atexp
+	      | toAtExp (F.N _) = raise EH.DeadBranch "there should be no node at this stage yet"
+
+	    fun toApp [] = raise EH.DeadBranch ""
+	      | toApp [atexp]  =
+		let val atexp = atexp ()
+		in A.mk_term A.EXP_ATEXP "" [] [atexp]
+		end
+	      | toApp atexps =
+		let val atexpEnd = List.hd (List.rev atexps)
+		    val atexpsBeg = List.rev (List.tl (List.rev atexps))
+		    val exp = toApp atexpsBeg
+		    val atexp = atexpEnd ()
+		in A.mk_term A.EXP_APP "" [] [exp, atexp]
+		end
+
+	    fun toApp' [] = []
+	      | toApp' atexps =
+		let val fst = List.hd atexps
+		    val lst = List.hd (List.rev atexps)
+		    val fexp = fn () => toApp (map toAtExp atexps)
+		in [F.L (fexp, [])]
+		end
+
+	    fun convNonOp [] rest = toApp' rest
+	      | convNonOp ((F.O (st, regs)) :: xs) rest =
+		if F.isInfix st
+		then (toApp' rest) @ [F.O (st, regs)] @ (convNonOp xs [])
+		else let val atexp = fn () =>
+					let val id = A.mk_term A.ID_VID st regs []
+					in A.mk_term A.ATEXP_ID "" [] [id]
+					end
+		     in convNonOp xs (rest @ [F.L (atexp, [])])
+		     end
+	      | convNonOp ((F.L (atexp, regs)) :: xs) rest = convNonOp xs (rest @ [F.L (atexp, regs)])
+	      | convNonOp ((F.N _) :: xs) _ = raise EH.DeadBranch "there should be no node at this stage"
+
+	in cons1 (F.convert (convNonOp appexp []))
+	end)
+
+exp :
+  infexp
+    (infexp)
+| exp ORELSE exp
+    (fn () =>
+	let val exp1 = exp1 ()
+	    val exp2 = exp2 ()
+	    val reg  = R.consReg ORELSEleft ORELSEright
+	in A.mk_term A.EXP_OR "" [reg] [exp1, exp2]
+	end)
+| exp ANDALSO exp
+    (fn () =>
+	let val exp1 = exp1 ()
+	    val exp2 = exp2 ()
+	    val reg  = R.consReg ANDALSOleft ANDALSOright
+	in A.mk_term A.EXP_AND "" [reg] [exp1, exp2]
+	end)
+| exp COLON types
+    (fn () =>
+	let val exp = exp ()
+	    val ty = types ()
+	    val reg = R.consReg COLONleft COLONright
+	in A.mk_term A.EXP_TYPE "" [reg] [exp, ty]
+	end)
+| exp HANDLE match
+    (fn () =>
+	let val exp = exp ()
+	    val match = match ()
+	    val reg = R.consReg HANDLEleft HANDLEright
+	in A.mk_term A.EXP_HANDLE "" [reg] [exp, match]
+	end)
+| FN match
+    (fn () =>
+	let val match = match ()
+	    val reg = R.consReg FNleft FNright
+	in A.mk_term A.EXP_FN "" [reg] [match]
+	end)
+| CASE exp OF match
+    (fn () =>
+	let val exp = exp ()
+	    val match = match ()
+	    val reg1 = R.consReg CASEleft CASEright
+	    val reg2 = R.consReg OFleft OFright
+	in A.mk_term A.EXP_CASE "" [reg1, reg2] [exp, match]
+	end)
+| IF exp THEN exp ELSE exp
+    (fn () =>
+	let val exp1 = exp1 ()
+	    val exp2 = exp2 ()
+	    val exp3 = exp3 ()
+	    val reg1 = R.consReg IFleft IFright
+	    val reg2 = R.consReg THENleft THENright
+	    val reg3 = R.consReg ELSEleft ELSEright
+	in A.mk_term A.EXP_ITE "" [reg1, reg2, reg3] [exp1, exp2, exp3]
+	end)
+| WHILE exp DO exp
+    (fn () =>
+	let val exp1 = exp1 ()
+	    val exp2 = exp2 ()
+	    val reg1 = R.consReg WHILEleft WHILEright
+	    val reg2 = R.consReg DOleft DOright
+	in A.mk_term A.EXP_WHILE "" [reg1, reg2] [exp1, exp2]
+	end)
+| RAISE exp
+    (fn () =>
+	let val exp = exp ()
+	    val reg = R.consReg RAISEleft RAISEright
+	in A.mk_term A.EXP_RAISE "" [reg] [exp]
+	end)
+
+matchbar :
+  mrule
+    (fn () => [mrule ()])
+| mrule PIPE matchbar
+    (fn () =>
+	let val mrule = mrule ()
+	    val mrules = matchbar ()
+	    val reg = R.consReg PIPEleft PIPEleft
+	in mrule :: mrules
+	end)
+
+match :
+  matchbar
+    (fn () =>
+	let val mrules = matchbar ()
+	in A.mk_term A.MATCH_M "" [] mrules
+	end)
+
+mrule :
+  pat DARROW exp
+    (fn () =>
+	let val pat = pat ()
+	    val exp = exp ()
+	    val reg = R.consReg DARROWleft DARROWright
+	in A.mk_term A.MRULE_M "" [reg] [pat, exp]
+	end)
+
+atpattuple :
+  pat COMMA pat
+    (fn () =>
+	let val pat1 = pat1 ()
+	    val pat2 = pat2 ()
+	    val reg = R.consReg COMMAleft COMMAleft
+	in [pat1, pat2]
+	end)
+|  pat COMMA atpattuple
+    (fn () =>
+	let val pat = pat ()
+	    val pats = atpattuple ()
+	    val reg = R.consReg COMMAleft COMMAleft
+	in pat :: pats
+	end)
+
+patlist :
+    (fn () => [])
+| nepatlist
+    (nepatlist)
+
+nepatlist :
+  pat
+    (fn () =>
+	let val pat = pat ()
+	in [pat]
+	end)
+| pat COMMA nepatlist
+    (fn () =>
+	let val pat = pat ()
+	    val pats = nepatlist ()
+	    val reg = R.consReg COMMAleft COMMAleft
+	in pat :: pats
+	end)
+
+identty :
+  ident
+    (fn () =>
+	let val id = ident ()
+	in A.mk_term A.IDENTTY_ID "" [] [id]
+	end)
+| ident COLON types
+    (fn () =>
+	let val id = ident ()
+	    val ty = types ()
+	    val reg = R.consReg COLONleft COLONright
+	in A.mk_term A.IDENTTY_TY "" [] [id, ty]
+	end)
+
+onepatrow :
+ tylab EQUALOP pat
+    (fn () =>
+	let val lab = tylab ()
+	    val pat = pat ()
+	    val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_term A.PATROW_EQ "" [reg] [lab, pat]
+	end)
+| identty
+    (fn () =>
+	let val id = identty ()
+	in A.mk_term A.PATROW_ID "" [] [id]
+	end)
+| identty AS pat
+    (fn () =>
+	let val id = identty ()
+	    val pat = pat ()
+	    val reg = R.consReg ASleft ASright
+	in A.mk_term A.PATROW_AS "" [] [id, pat]
+	end)
+| WILDCARD
+    (fn () =>
+	let val reg = R.consReg WILDCARDleft WILDCARDright
+	in A.mk_term A.PATROW_WILD "" [reg] []
+	end)
+
+patrow :
+  onepatrow
+    (fn () =>
+	let val row = onepatrow ()
+	in [row]
+	end)
+| onepatrow COMMA patrow
+    (fn () =>
+	let val row = onepatrow ()
+	    val rows = patrow ()
+	    val reg = R.consReg COMMAleft COMMAright
+	in row :: rows
+	end)
+
+patrowopt :
+    (fn () => [])
+| patrow
+    (patrow)
+
+pat :
+  pat AS pat
+    (fn () =>
+	let val pat1 = pat1 ()
+	    val pat2 = pat2 ()
+	    val reg  = R.consReg ASleft ASright
+	in A.mk_term A.PAT_AS "" [reg] [pat1, pat2]
+	end)
+| pat COLON types
+    (fn () =>
+	let val pat = pat ()
+	    val ty = types ()
+	    val reg = R.consReg COLONleft COLONright
+	in A.mk_term A.PAT_TYPE "" [reg] [pat, ty]
+	end)
+| infpat
+    (infpat)
+
+apppat :
+  ID
+    ([F.O (ID, [R.consReg IDleft IDright])])
+| INID
+    ([F.O (INID, [R.consReg INIDleft INIDright])])
+| STAR
+    ([F.O ("*", [R.consReg STARleft STARright])])
+| longid'
+    ([F.L (fn () => A.mk_term A.ATPAT_ID "" [] [longid' ()], [])])
+| atpat
+    ([F.L (atpat, [])])
+| ID apppat
+    ((F.O (ID, [R.consReg IDleft IDright])) :: apppat)
+| INID apppat
+    ((F.O (INID, [R.consReg INIDleft INIDright])) :: apppat)
+| STAR apppat
+    ((F.O ("*", [R.consReg STARleft STARright])) :: apppat)
+| longid' apppat
+    ((F.L (fn () => A.mk_term A.ATPAT_ID "" [] [longid' ()], [])) :: apppat)
+| atpat apppat
+    ((F.L (atpat, [])) :: apppat)
+
+infpat :
+  apppat
+    (fn () =>
+	let fun cons2 (F.L (pat, _)) = pat ()
+	      | cons2 (F.O _) = raise EH.DeadBranch ""
+	      | cons2 (F.N ((st, r), t1, t2)) = cons1 (F.N ((st, r), t1, t2))
+
+	    and cons1 (F.L (pat, _)) = pat ()
+	      | cons1 (F.O _) = raise EH.DeadBranch ""
+	      | cons1 (F.N ((st, r), t1, t2)) =
+		let val pat1 = cons2 t1
+		    val pat2 = cons2 t2
+		in A.mk_term A.PAT_OP st [] [pat1, pat2]
+		end
+
+	    fun toAtPat (F.O (st, regs)) = (fn () => A.mk_term A.ATPAT_ID st regs [])
+	      | toAtPat (F.L (atpat, _)) = atpat
+	      | toAtPat (F.N _) = raise EH.DeadBranch "there should be no node at this stage yet"
+
+	    fun toApp [] = raise EH.DeadBranch ""
+	      | toApp [atpat] =
+		let val atpat = atpat ()
+		in A.mk_term A.PAT_ATPAT "" [] [atpat]
+		end
+	      | toApp atpats =
+		let val atpatsBeg = List.rev (List.tl (List.rev atpats))
+		    val atpatEnd = List.hd (List.rev atpats)
+		    val pat = toApp atpatsBeg
+		    val atpat = atpatEnd ()
+		in A.mk_term A.PAT_APP "" [] [pat, atpat]
+		end
+
+	    fun toApp' [] = []
+	      | toApp' atpats =
+		let val fst = List.hd atpats
+		    val lst = List.hd (List.rev atpats)
+		    val fpat = fn () => toApp (map toAtPat atpats)
+		in [F.L (fpat, [])]
+		end
+
+	    fun convNonOp [] rest = toApp' rest
+	      | convNonOp ((F.O (st, regs)) :: xs) rest =
+		if F.isInfix st
+		then (toApp' rest) @ [F.O (st, regs)] @ (convNonOp xs [])
+		else let val atpat =
+			  fn () =>
+			     let val id = A.mk_term A.ID_VID st regs []
+			     in A.mk_term A.ATPAT_ID "" [] [id]
+			     end
+		     in convNonOp xs (rest @ [F.L (atpat, [])])
+		     end
+	      | convNonOp ((F.L (atpat, regs)) :: xs) rest = convNonOp xs (rest @ [F.L (atpat, regs)])
+	      | convNonOp ((F.N _) :: xs) _ = raise EH.DeadBranch "there should be no node at this stage"
+
+	in cons1 (F.convert (convNonOp apppat []))
+	end)
+
+atpat :
+  atpat'
+    (atpat')
+| LPAREN RPAREN
+    (fn () =>
+	let val reg = R.consReg LPARENleft RPARENright
+	in A.mk_term A.ATPAT_TUPLE "" [reg] []
+	end)
+| LPAREN atpattuple RPAREN
+    (fn () =>
+	let val pats = atpattuple ()
+	    val reg1 = R.consReg LPARENleft LPARENleft
+	    val reg2 = R.consReg RPARENleft RPARENleft
+	in A.mk_term A.ATPAT_TUPLE "" [reg1, reg2] pats
+	end)
+| LPAREN pat RPAREN
+    (fn () =>
+	let val pat = pat ()
+	    val reg1 = R.consReg LPARENleft LPARENleft
+	    val reg2 = R.consReg RPARENleft RPARENleft
+	in A.mk_term A.ATPAT_PAREN "" [reg1, reg2] [pat]
+	end)
+
+atpat' :
+  OP ident
+    (fn () =>
+	let val id = ident ()
+	in A.mk_term A.ATPAT_ID "" [] [id]
+	end)
+| WILD
+    (fn () =>
+	let val reg = R.consReg WILDleft WILDright
+	in A.mk_term A.ATPAT_WILD "" [reg] []
+	end)
+| scon
+    (fn () =>
+	let val sc = scon ()
+	in A.mk_term A.ATPAT_SCON "" [] [sc]
+	end)
+| LBRACE patrowopt RBRACE
+    (fn () =>
+	let val rows = patrowopt ()
+	    val reg1 = R.consReg LBRACEleft LBRACEright
+	    val reg2 = R.consReg RBRACEleft RBRACEright
+	in A.mk_term A.ATPAT_RECORD "" [reg1, reg2] rows
+	end)
+| LLIST patlist RLIST
+    (fn () =>
+	let val pats = patlist ()
+	    val reg1 = R.consReg LLISTleft LLISTleft
+	    val reg2 = R.consReg RLISTleft RLISTleft
+	in A.mk_term A.ATPAT_LIST "" [reg1, reg2] pats
+	end)

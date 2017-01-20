@@ -1,0 +1,14 @@
+--------------------- FILES ---------------------
+
+o The .prog contains the code synthesized from aneris' specification.
+
+o The .emlc contains an example of a configuration file to run aneris.
+
+
+--------------------- VERSIONS ---------------------
+
+o aneris_nuprl_terms.prog is the default version
+
+o aneris_nuprl_terms_no_mul.prog varies from the default version by
+the fact that it does not use multiplication (in 2/3 which is the only
+place where multiplication is used) but only addition.

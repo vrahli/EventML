@@ -1,0 +1,351 @@
+specification pv7
+
+(* ------ PARAMETERS ------ *)
+
+parameter accpts : Loc Bag  (* Locations of acceptors *)
+parameter reps   : Loc Bag  (* Locations of replicas  *)
+parameter ldrs   : Loc Bag  (* Locations of leaders   *)
+(* We're assuming that none of these bags has repetitions. *)
+
+parameter ldrs_uid : Loc -> Int
+(* This function is used to order the leader locations.
+ * This is necessary to order the ballot numbers. *)
+
+
+parameter Op,  eqOp   : Type * Op  Deq (* Operations invoked by replicas.  *)
+parameter Cid, eq_Cid : Type * Cid Deq (* Command identifiers              *)
+
+parameter Result      : Type           (* Results returned by replicas     *)
+parameter RepState    : Type           (* Internal state of replicas       *)
+
+parameter init_rstate : RepState       (* Common initial state of replicas *)
+parameter apply_op    : Op -> RepState -> RepState * Result
+
+
+(* ------ TYPE FUNCTIONS USED BY PAXOS ------ *)
+
+(* A ballot number is a pair integer/leader id.
+ * Union is used so that inr() is a dummy initial ballot number.
+ * Ballot numbers are totally ordered, and inr() is the smallest ballot number. *)
+type Ballot_Num = (Int * Loc) + Unit
+type Command    = Loc * Cid * Op
+type Slot_Num   = Int (* Slot_Num should be NatPlus *)
+type Proposal   = Slot_Num * Command
+type PValue     = Ballot_Num * Proposal
+type PVlist     = PValue List
+
+type ReplicaState = RepState * Slot_Num * Proposal List * Proposal List
+
+(* ------ VARIABLES ------ *)
+
+variable sn    : Slot_Num
+variable state : ReplicaState
+variable loc   : Loc
+variable bnum  : Ballot_Num
+
+(* ------ SOME LIBRARY FUNCTIONS ------ *)
+
+import map mapfilter deq-member bag-append bl-exists bag-size
+       bag-remove list_accum outl
+
+
+(* ------ SOME USEFUL FUNCTIONS ------ *)
+
+let leq_bnum' (i1,l1) (i2,l2) = i1 < i2 or (i1 = i2 & ldrs_uid l1 <= ldrs_uid l2);;
+
+(* leq : Ballot_Num -> Ballot_Num -> Bool ;;*)
+let leq_bnum bn1 bn2 = !(isl bn1) or (isl bn1 & isl bn2 & leq_bnum' (outl bn1) (outl bn2));;
+
+let lt_bnum' (i1,l1) (i2,l2) = i1 < i2 or (i1 = i2 & ldrs_uid l1 < ldrs_uid l2);;
+
+let lt_bnum bn1 bn2 =
+  (!(isl bn1) & isl bn2)
+  or
+  (isl bn1 & isl bn2 & lt_bnum' (outl bn1) (outl bn2));;
+
+(* max : Ballot_Num -> Ballot_Num -> Ballot_Num ;;*)
+(* If they're equal, we take bn2. *)
+let max_bnum bn1 bn2 = if leq_bnum bn1 bn2 then bn2 else bn1;;
+
+let pmax pvals =
+  (* We keep only the ones where the slot_number is = and the ballot num is > *)
+  let g bn sn (bn',(s',_)) = sn = s' & lt_bnum bn bn' in
+  (* P says that bn has to be a isl. *)
+  let P (bn, (s, c)) = !(bl-exists pvals (g bn s)) in
+    mapfilter snd P pvals;;
+
+let update_proposals proposals1 proposals2 =
+  list_accum (\a.\ (sn,p).
+                  if bl-exists proposals2 (\ (s',_). sn = s')
+                  then a
+                  else (sn,p) . a)
+             proposals2
+             proposals1 ;;
+
+let domain = map fst ;;
+let range  = map snd ;;
+
+let in_domain deq x xys = deq-member deq x (domain xys) ;;
+let in_range  deq y xys = deq-member deq y (range xys) ;;
+
+let add_no_occ eq lst val =
+  if bl-exists lst (\v. (eqof eq) v val)
+  then lst
+  else lst ++ [val] ;;
+
+let append_no_occ eq = list_accum (\a.\x.add_no_occ eq a x);;
+
+let out_tr tr loc x (s,_) = tr x s ;;
+
+(* A computed parameter *)
+let threshold = (bag-size accpts + 1) / 2 ;;
+
+let iterate_tr (tr : 'i -> 's -> 's * 'r Bag) (init :'s) (ops : 'i List) : 's * 'r Bag =
+  list_accum (\ (s,b).\x. let (s',b') = tr x s in (s', bag-append b b'))
+             (init, {})
+             ops ;;
+
+
+(* ------ INTERFACE ------ *)
+
+(* In the definitions of p1a, p1b, p2a, p2b, the Int should be Nat. *)
+
+internal p1a : Loc * Ballot_Num            (* Leader [Scout?] -> Acceptor
+                                              The location is the Scout's leader, *)
+internal p1b : Loc * (Ballot_Num * PVlist) (* Acceptor -> Scout
+                                              The Loc is the Acceptor's location *)
+internal p2a : Loc * PValue                (* Leader [Commander?]->  Acceptor
+                                              The Loc is the Commander's leader, *)
+internal p2b : Loc * Ballot_Num            (* Acceptor -> Commander
+                                              The Loc is the Acceptor's location *)
+internal preempted : Ballot_Num           (* Commander,Scout->  Leader *)
+internal adopted   : Ballot_Num *  PVlist (* Scout -> Leader *)
+internal propose   : Proposal             (* Replica -> Leader *)
+internal decision  : Proposal             (* Commander -> Replica *)
+input    request   : Command              (* client -> Replica *)
+output   response  : Cid * Result         (* Replica -> client *)
+
+
+(* ------ INITIAL VALUES ------ *)
+
+let dummy_ballot : Ballot_Num = inr () ;;
+
+let init_accepted : PVlist = [] ;;
+let init_acceptor = (dummy_ballot, init_accepted) ;;
+
+let init_slot_num : Slot_Num = 1 ;;
+let init_proposals : Proposal List = [] ;;
+let init_decisions : Proposal List = [] ;;
+let init_latest_decision : Proposal + Unit = inr() ;;
+let init_replica : ReplicaState = (init_rstate,
+                                   init_slot_num,
+      	       	   	           init_proposals,
+                                   init_decisions) ;;
+
+let init_pvalues : PVlist = [];;
+let init_scout = (accpts, init_pvalues);;
+
+let init_ballot_num loc : Ballot_Num = inl (0,loc);;
+let init_active = false ;;
+let init_leader loc = (init_ballot_num loc, init_active, init_proposals) ;;
+
+
+(* ------ ACCEPTOR ------ *)
+
+let AcceptorStateP1a_tr loc (_,x) (ballot_num, accepted) =
+  (max_bnum x ballot_num, accepted);;
+
+let AcceptorStateP2a_tr loc (_,(b,sp):PValue) (ballot_num, accepted) =
+  let ballot_num' = max_bnum b ballot_num in
+  let accepted' = if leq_bnum ballot_num b
+     	          then add_no_occ (op =) accepted (b,sp)
+	       	  else accepted in
+    (ballot_num', accepted') ;;
+
+class AcceptorState =
+  State(\l.init_acceptor,
+        AcceptorStateP1a_tr, p1a'base,
+        AcceptorStateP2a_tr, p2a'base)
+;;
+
+class AcceptorsP1a =
+  let f loc (ldr,_) bnum_acc = {p1b'send ldr (loc,bnum_acc)}
+  in f o (p1a'base,AcceptorState) ;;
+
+class AcceptorsP2a =
+  let f loc (ldr,_) (bnum, _) = {p2b'send ldr (loc,bnum)}
+  in f o (p2a'base,AcceptorState) ;;
+
+class Acceptor = AcceptorsP1a || AcceptorsP2a ;;
+
+(* ------ COMMANDER ------ *)
+
+(* An input to a Commander number is a p2b message sent to its
+leader. *)
+
+(*
+The parameters to Commander:
+  (b,(s,p)): the pvalue that this Commander is working on
+
+*)
+
+class CommanderNotify bsp = Output(\ldr.p2a'broadcast accpts (ldr, bsp)) ;;
+
+class CommanderState b =
+  let tr loc (a : Loc,b') waitfor =
+    if b = b' then bag-remove (op =) waitfor a else waitfor
+  in State(\_.accpts, tr, p2b'base) ;;
+
+class CommanderOutput (b,(s,p)) =
+  let f ldr (a,b') waitfor =
+    if b = b'
+    then if bag-size waitfor < threshold
+         then decision'broadcast reps (s,p)
+         else {} (* keep looking for majority *)
+    else (* when b <> b', send preempted *)
+         { preempted'send ldr b' }
+  in Once(f o (p2b'base,CommanderState b)) ;;
+
+class Commander bsp = CommanderNotify bsp || CommanderOutput bsp ;;
+
+
+(* ------ SCOUT ------ *)
+
+(*
+The parameters to Scout:
+  b:        the ballot_num this Scout is working on
+
+We also split a Scout into a notify and a process subtask.  *)
+
+class ScoutNotify b = Output(\ldr.p1a'broadcast accpts (ldr, b));;
+
+class ScoutState b =
+  let tr loc (a : Loc,(b',r : PVlist)) (waitfor,pvalues) =
+      if b = b'
+      then let waitfor' = bag-remove (op =) waitfor a in
+           let pvalues' = append_no_occ (op =) pvalues r in
+             (waitfor',pvalues')
+      else (waitfor,pvalues)
+  in State(\_.init_scout, tr, p1b'base) ;;
+
+class ScoutOutput b =
+  let f ldr (a,(b',r)) (waitfor,pvalues) =
+    if b = b'
+    then if bag-size waitfor < threshold
+         then { adopted'send ldr (b,pvalues) }
+         else {}
+    else { preempted'send ldr b' }
+  in Once(f o (p1b'base,ScoutState b));;
+
+class Scout b = ScoutNotify b || ScoutOutput b ;;
+
+
+(* ------ LEADER ------ *)
+
+let LeaderState_propose_tr loc ((s,p) : Proposal) (ballot_num, active, proposals) =
+  let proposals' =
+    if in_domain (op =) s proposals
+    then proposals
+    else add_no_occ (op =) proposals (s,p)
+  in (ballot_num,active,proposals') ;;
+
+let LeaderState_adopted_tr loc (bnum,pvals) (ballot_num, active, proposals) =
+  if bnum = ballot_num
+  then let proposals' = update_proposals proposals (pmax (pvals : PVlist))
+       in (ballot_num, true, proposals')
+  else (ballot_num,active,proposals) ;;
+
+let LeaderState_preempted_tr ldr bnum (ballot_num, active, proposals) =
+  if isl bnum & lt_bnum ballot_num bnum
+  then let (r',loc') = outl bnum in (inl (r' + 1,ldr), false, proposals)
+  else (ballot_num, active, proposals) ;;
+
+class LeaderState =
+  State(\l.init_leader l,
+        LeaderState_propose_tr,   propose'base,
+        LeaderState_adopted_tr,   adopted'base,
+        LeaderState_preempted_tr, preempted'base);;
+class PrLeaderState = Prior(LeaderState)?(\l.{init_leader l});;
+
+class Leader_propose_aux =
+  let f loc (sn, p) (ballot_num, active, proposals) =
+    if active & !(in_domain (op =) sn proposals)
+    then {(ballot_num,(sn,p))}
+    else {}
+  in f o (propose'base,PrLeaderState) ;;
+
+class LeaderPropose = Leader_propose_aux >>= Commander ;;
+
+class Leader_adopted_aux =
+  let f loc _ (bnum, _, props) = (map (\sp. (bnum,sp)) props)/~
+  in f o (adopted'base,LeaderState) ;;
+
+class LeaderAdopted = Leader_adopted_aux >>= Commander;;
+
+class Leader_preempted_aux =
+  let f ldr bnum (ballot_num, _, _) =
+    if isl bnum & lt_bnum ballot_num bnum
+    then {inl(fst(outl bnum) + 1,ldr)}
+    else {}
+  in f o (preempted'base,PrLeaderState) ;;
+
+class LeaderPreempted = Leader_preempted_aux >>= Scout ;;
+
+class SpawnFirstScout = OnLoc(\ldr.Scout(inl(0,ldr)));;
+
+class Leader = LeaderPropose
+            || LeaderAdopted
+            || LeaderPreempted
+            || SpawnFirstScout ;;
+
+
+(* ------ REPLICA ------ *)
+
+(* first_unoccupied ps = least positive integer that is *not* a member of ps *)
+let first_unoccupied (ps : Slot_Num List) : Slot_Num =
+  list_accum (\a.\x. if x = a then a + 1 else a) 1 ps
+;;
+
+let propose p (rs, sn, prs, dcs)  =
+  if in_range (op =) p dcs
+  then ((rs, sn, prs, dcs), {})
+  else let s' = first_unoccupied (domain (prs ++ dcs)) in
+       let prs' = add_no_occ (op =) prs (s',p) in
+       let msgs = propose'broadcast ldrs (s',p) in
+         ((rs, sn, prs', dcs), msgs) ;;
+
+let perform (cmd : Command) ((rstate, slot_num, proposals, decisions) : ReplicaState) =
+  let (client,cid,ope) = cmd in
+    if bl-exists decisions (\ (s,c) . s < slot_num & c = cmd)
+    then ((rstate,slot_num + 1,proposals,decisions),{})
+    else let (next, result) = apply_op ope rstate in
+         let new_state = (next, slot_num + 1, proposals, decisions) in
+           (new_state, {response'send client (cid,result)})
+;;
+
+let inner_tr p' state =  (* applied when (n,p') \in decided *)
+  let (rstate, slot_num, proposals, decisions) = state in
+  let to_repropose = mapfilter snd (\ (m,p'') . m = slot_num & !(p'' = p')) proposals in
+  let (new_state, proposes) = iterate_tr propose state to_repropose in
+  let (new_state', responses) = perform p' new_state in
+    (new_state', bag-append proposes responses) ;;
+
+(* Each iteration of inner_tr performs one operation and also finds
+ * all elements of proposals sharing the slot number of the operation
+ * performed and reproposes them.  It does the reproposing first *)
+
+let Replica_decision v ((rstate, slot_num, proposals, decisions) : ReplicaState) =
+  let decisions' = add_no_occ (op =) decisions v in
+  let ready = mapfilter snd (\ (s,_) . s = slot_num) decisions' in
+    iterate_tr inner_tr (rstate, slot_num, proposals, decisions') ready ;;
+
+class ReplicaState =
+  State(\_.(init_replica,{}),
+        out_tr propose,          request'base,
+        out_tr Replica_decision, decision'base) ;;
+
+class Replica = (\_.snd) o ReplicaState ;;
+
+class Pax = Replica @ reps || Leader @ ldrs || Acceptor @ accpts ;;
+
+main Pax

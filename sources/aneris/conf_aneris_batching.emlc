@@ -1,0 +1,46 @@
+%locations acceptors
+ acc1 : 127.0.0.1 8887
+ acc2 : 127.0.0.1 8888
+ acc3 : 127.0.0.1 8889
+
+%locations leaders
+ ldr1 : 127.0.0.1 8891
+ ldr2 : 127.0.0.1 8892
+
+%locations two_thirds
+ loc1 : 127.0.0.1 8893
+ loc2 : 127.0.0.1 8894
+ loc3 : 127.0.0.1 8895
+ loc4 : 127.0.0.1 8869
+
+%locations replicas
+ rep1 : 127.0.0.1 8870
+ rep2 : 127.0.0.1 8871
+
+%locations external clients
+ client1 : 127.0.0.1 8875
+
+%connections
+  acceptors  -> leaders
+  leaders    -> replicas
+  two_thirds -> replicas
+  clients    -> replicas
+
+%parameters
+ Op       : TYPE(Tok List)
+ accpts   : {LOC(acc1);LOC(acc2);LOC(acc3)}
+ clients  : {LOC(client1)}
+ eq_Op    : DEQ(Tok List)
+ flrs     : 1
+ ldrs     : {LOC(ldr1);LOC(ldr2)}
+ ldrs_uid : \loc.if loc = LOC(ldr1) then 1 else 2
+ locs     : {LOC(loc1);LOC(loc2);LOC(loc3);LOC(loc4)}
+ mf       : \hdr.1
+ reps     : {LOC(rep1);LOC(rep2)}
+ timeout  : 2
+
+%messages
+ rep1 : (``swap``, (Int * Tok List), (1,``2/3``))
+ rep1 : (``bcast``, (Int * Tok List), (2,``client0torep1``))
+
+%databases

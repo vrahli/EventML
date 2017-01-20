@@ -1,0 +1,166 @@
+specification OARcast
+options mono
+
+parameter orderers  : Loc Bag (* Locations of the orderers *)
+parameter receivers : Loc Bag (* Locations of the receivers *)
+parameter senders   : Loc Bag (* Locations of the senders *)
+parameter M         : Type    (* Type of OARcast messages *)
+parameter deqM      : M -> M -> Bool
+parameter flrs      : Int
+
+parameter oarcasthdr : Tok List
+parameter orderhdr   : Tok List
+parameter orderedhdr : Tok List
+parameter deliverhdr : Tok List
+
+type SeqM = Int * M ;;   (* sequence number and message *)
+type OAstate = Int * SeqM List ;;
+type ODstate = Loc Bag * (M * Int) List ;;
+
+import deq-member id-deq map outl int-deq bag-union
+       oarcast-deliver-output
+       update-oarcast-deliver
+       process-ordered-message
+
+variable l loc sndr sender slf : Loc
+variable seq : Int
+
+
+(* ------ INTERFACE  ------ *)
+
+input oarcast, oarcasthdr : M
+
+(* sender to orderer
+   The location is the location of the sender  *)
+internal order, orderhdr : Loc * SeqM
+
+(* orderer to receiver
+   The first location is the location of the orderer
+   and the second location is the location of the original sender *)
+internal ordered, orderedhdr : Loc * (Loc * SeqM)
+
+(* The location is the location of the original sender *)
+output deliver, deliverhdr : Loc * SeqM
+
+
+
+(* ------ CLASSES  ------ *)
+
+(* == sender == *)
+
+let on_oarcast_update slf msg seqnum = seqnum + 1 ;;
+
+let on_oarcast_output slf msg seqnum =
+  order'bsign orderers (slf,(seqnum,msg)) ;;
+
+class SenderState =
+   State(\slf.0,
+         on_oarcast_update,
+       	 oarcast'base);;
+
+class Sender =
+  on_oarcast_output o (oarcast'base,SenderState) ;;
+
+(* == orderer == *)
+
+let oastate_init : SeqM List * OAstate = ([],(0,[])) ;;
+
+let orderer_for_sender sndr loc (l,seqm) (_,state) =
+  if l = sndr
+  then process-ordered-message state seqm
+  else ([],state) ;;
+
+class OrdererForSenderState sndr =
+  State(\slf.oastate_init,
+        orderer_for_sender sndr,
+        order'verify) ;;
+
+let orderer_for_sender_outputs sndr slf (seqms,_) =
+  (* This broadcast should sign the messages before sending them *)
+  bag-union ((map (\seqm. ordered'bsign receivers (slf,(sndr,seqm)))
+                  seqms)/~) ;;
+
+class OrdererForSender sndr =
+  (orderer_for_sender_outputs sndr) o (OrdererForSenderState sndr) ;;
+
+let on_order_update slf (sndr,(n,msg)) state =
+  if deq-member id-deq sndr state
+  then state
+  else sndr . state ;;
+
+let on_order_output slf (sndr,(n,msg)) state =
+  if deq-member id-deq sndr state
+  then {}
+  else {sndr} ;;
+
+class OrdererState =
+   State(\slf.[],on_order_update,order'verify);;
+
+class Orderer =
+  (on_order_output o (order'verify,OrdererState))
+   >>= OrdererForSender ;;
+
+(* == deliverer == *)
+
+let init_odstate = (orderers,[]) ;;
+
+let deliverer_for_sender_seq_update sndr seq slf (orderer,(l,(s,m))) state =
+  if sndr = l & seq = s
+  then update-oarcast-deliver deqM state (orderer,m)
+  else state ;;
+
+class DelivererForSenderSeqState sndr seq =
+  State(\slf.init_odstate,
+        deliverer_for_sender_seq_update sndr seq,
+        ordered'verify) ;;
+
+let deliverer_for_sender_seq_output sndr seq slf state =
+  let d = oarcast-deliver-output ((2 * flrs) + 1) state in
+   if isl d
+   then {deliver'send slf (sndr, (seq, outl d))}
+   else {} ;;
+
+class DelivererForSenderSeq sndr seq =
+  (deliverer_for_sender_seq_output sndr seq)
+   o (DelivererForSenderSeqState sndr seq) ;;
+
+let deliverer_for_sender_update sndr slf (orderer,(sndr,(seq,m))) state =
+  if deq-member int-deq seq state
+  then state
+  else seq . state ;;
+
+let deliverer_for_sender_output sndr slf (orderer,(sndr,(seq,m))) state =
+  if deq-member int-deq seq state
+  then {}
+  else {seq} ;;
+
+class DelivererForSenderState sndr =
+  State(\slf.[],
+        deliverer_for_sender_update sndr,
+        ordered'verify) ;;
+
+class DelivererForSender sndr =
+  ((deliverer_for_sender_output sndr) o (ordered'verify,DelivererForSenderState sndr))
+   >>= (DelivererForSenderSeq sndr) ;;
+
+
+let on_ordered_update slf (orderer,(sndr,(n,msg))) state =
+  if deq-member id-deq sndr state
+  then state
+  else sndr . state ;;
+
+let on_ordered_output slf (orderer,(sndr,(n,msg))) state =
+  if deq-member id-deq sndr state
+  then {}
+  else {sndr} ;;
+
+class DelivererState =
+   State(\slf.[],on_ordered_update,ordered'verify);;
+
+class Deliverer =
+  (on_ordered_output o (ordered'verify,DelivererState))
+   >>= DelivererForSender ;;
+
+main (Orderer   @ orderers)
+  || (Deliverer @ receivers)
+  || (Sender    @ senders)

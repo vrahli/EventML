@@ -1,0 +1,17 @@
+==== To generate Lisp code from an EML specification:
+
+1) This command generates a file that contains the Nuprl declarations
+corresponding to the EML specification (because of the 'dump'):
+
+  ../bin/eventml --i spec.esh --nuprl --lib alldefs.eml --file1 spec.prog --extra dump
+
+2) Test the prog file:
+
+  ../bin/eventml --i spec.prog --nuprl-defs alldefs --conf spec.emlc --simul
+
+3) Generate the Lisp code from the prog file:
+
+  ../bin/eventml --i spec.prog --o spec.lisp --tolisp --nuprl-defs alldefs
+
+4) Make sure that the parameters of the main function at the end of the
+Lisp file are in the same order as the parameters in the conf file.

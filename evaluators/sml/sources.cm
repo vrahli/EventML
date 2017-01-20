@@ -1,0 +1,72 @@
+(* Copyright 2011 Cornell University
+ * Copyright 2012 Cornell University
+ * Copyright 2013 Cornell University
+ *
+ *
+ * This file is part of EventML - a tool aiming at specifying
+ * distributed protocols in an ML like language.  It is an interface
+ * to the logic of events and is compiled into Nuprl.  It is written
+ * by the NUPRL group of Cornell University, Ithaca, NY.
+ *
+ * EventML is a free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * EventML is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with EventML.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *  o Authors:     Vincent Rahli
+ *  o Affiliation: Cornell University, NUPRL group
+ *  o Date:        20 May 2011
+ *  o File name:   sources.cm
+ *  o Description: .
+ *)
+
+
+Library
+
+  structure Interface
+  structure Parser
+  structure Ast
+  structure Evaluators
+
+is
+
+  $/basis.cm
+  $/smlnj-lib.cm
+  $/ml-yacc-lib.cm
+
+  ML.lex : shell (target:ML.lex.sml ml-lex %s)
+  ML.grm : MLYacc
+
+  Region.sig
+  Region.sml
+  ErrorHandler.sig
+  ErrorHandler.sml
+  Comment.sig
+  Comment.sml
+  LexDefs.sig
+  LexDefs.sml
+  ParseDefs.sig
+  ParseDefs.sml
+  Infix.sig
+  Infix.sml
+  Parser.sig
+  Parser.sml
+  Ast.sig
+  Ast.sml
+  EvaluatorsBackground.sml
+  Evaluator1.sml
+  Evaluator2.sml
+  Evaluator3.sml
+  Evaluator4.sml
+  Evaluators.sig
+  Evaluators.sml
+  Interface.sig
+  Interface.sml

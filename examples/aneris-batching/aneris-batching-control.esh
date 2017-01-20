@@ -1,0 +1,60 @@
+specification aneris_control
+
+parameter reps    : Loc Bag
+parameter ldrs    : Loc Bag
+parameter accpts  : Loc Bag
+parameter locs    : Loc Bag
+parameter clients : Loc Bag
+
+parameter Op,  eq_Op  : Type * Op  Deq
+
+parameter ldrs_uid    : Loc -> Int
+parameter flrs        : Int
+
+parameter timeout : Int
+
+import product-deq id-deq union-deq list-deq atom-deq int-deq
+
+type TaggedCommand = (Int * Tok List) + (Int * Op List)
+
+let tagged_cmd_deq =
+  union-deq (::(Int * Tok List))
+            (::(Int * Op List))
+            (product-deq ::Int ::(Tok List) int-deq (list-deq atom-deq))
+            (product-deq ::Int ::(Op List) int-deq (list-deq eq_Op)) ;;
+
+include aneris-pax-v1
+  where propose  = ``pv11_p1 propose``
+    and decision = ``decision``
+    and accpts   = accpts
+    and reps     = reps
+    and ldrs     = ldrs
+    and ldrs_uid = ldrs_uid
+    and type Cmd = TaggedCommand
+
+include robust-simple-consensus-v4
+  where propose  = ``rsc4 propose``
+    and notify   = ``decision``
+    and type Cmd = TaggedCommand
+    and cmdeq    = tagged_cmd_deq
+    and coeff    = 2
+    and flrs     = flrs
+    and locs     = locs
+    and clients  = reps
+
+include aneris-batching
+  where bcast       = ``bcast``
+    and swap        = ``swap``
+    and pax_propose = ``pv11_p1 propose``
+    and tt_propose  = ``rsc4 propose``
+    and decision    = ``decision``
+    and response    = ``response``
+    and timer       = ``timer``
+    and timeout     = timeout
+    and reps        = reps
+    and pax_procs   = ldrs
+    and tt_procs    = locs
+    and clients     = clients
+    and type Op     = Op
+
+main rsc4_main || aneris_pax_v1_main || aneris_batch_main

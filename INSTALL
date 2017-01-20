@@ -1,0 +1,85 @@
+How to install EventML?
+
+
+We should support the following systems:
+  - Ubuntu 10.10 (32 bits)
+  - Ubuntu 11.04 (64 bits)
+  - Windows XP (32 bits)
+  - Windows 7 (32 and 64 bits)
+
+
+Requirements for a Linux installation:
+  - MLton: to compile EventML.
+  - mllex and mlyacc: to compile EventML (provided by MLton).
+  - gmp: to compile EventML (multi precision library).
+  - latex: to compile the documentation.
+  - rubber: to compile the documentation.
+  - imagemagick: to compile the documentation (to generate the images).
+
+
+On Linux:
+
+  - Emacs is required.  Best is to get at least v23.1.
+
+  - Run the package.sh script.  This is going to generate a .tar.gz
+    archive in '../'.
+
+  - Untar the archive and run './configure; make; make install'.  (You
+    need to be root to run 'make install'.)  Alternatively, you can use
+    the '--prefix' option on './configure' to install EventML at a
+    different location than the "usual" one.
+
+
+On Windows (this explanation assumes that you know very little Emacs):
+
+  - Emacs is required.  The latest version can be downloaded at the
+    following location:
+      http://ftp.gnu.org/gnu/emacs/windows/emacs-23.3-bin-i386.zip
+
+    Once it has been downloaded, just unzip it wherever you want.
+
+  - Try to run Emacs by either using the Windows GUI going to the
+    location where you unzipped Emacs, then going into the 'bin'
+    directory, and finally clicking the 'emacs' executable.
+    (If it fails, try a second time, who knows...)
+    Or you can start a Windows command prompt, using 'dir' go to the
+    location where you unzipped Emacs, then to the 'bin' directory and
+    then run Emacs by typing 'emacs' and then hitting the 'Enter'
+    key.
+
+    One of these should start Emacs.  Leave Emacs open, it can be
+    useful later in the process.
+
+  - If you're trying to install EventML under windows, you should have
+    been provided a directory containing this INSTALL file, a bin
+    directory, a lib directory, and a ui directory.
+
+    These three directories should be in the same directory.  Let us
+    called that directory DIR.
+
+  - You then need to edit your .emacs file which, if it already exists
+    should be located at the following location (or similar location):
+      C:\Documents and Settings\username\
+
+    If it doesn't exist, you can create it in Emacs.  In Emacs type
+    'Control-x-f' (hold the 'Ctrl' key with one finger then press 'x'
+    with another finger and then 'f', and then release the 'Ctrl'
+    key).  You will see a prompter down at the bottom of the Emacs
+    window prompting for a file name.  Just type '~/.emacs' (it does
+    not matter if there is already the name of a file or the name of a
+    directory in there, you don't have to erase anything.)
+
+    Write the following lines in your .emacs file (replacing DIR by
+    its value):
+      (defvar eventml-repos "DIR")
+      (load-file (expand-file-name "ui/eventml-config.el" eventml-repos))
+
+
+    For example, using the Windows format, if DIR is:
+      C:\Documents and Settings\user\EventML
+    then replace DIR by (replace the backslashes by forward slashes):
+      c:/Documents and Settings/user/EventML
+
+  - You then need to create a temporary directory that EventML is
+    going to use to store its temporary files (we will soon change
+    that).  It has to be 'c:/tmp'.

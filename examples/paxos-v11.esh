@@ -1,0 +1,160 @@
+specification chronos
+options mono
+
+(* ------ PARAMETERS ------ *)
+
+parameter reps : Loc Bag
+parameter ldrs : Loc Bag
+parameter locs : Loc Bag
+
+parameter Op : Type
+parameter Cid, eq_Cid : Type * Cid Deq
+
+parameter request     : Tok List
+parameter swap        : Tok List
+parameter pax_propose : Tok List
+parameter tt_propose  : Tok List
+parameter decision    : Tok List
+parameter response    : Tok List
+
+
+(* ------ TYPE FUNCTIONS USED BY PAXOS ------ *)
+
+type Protocol      = Tok List
+type NProtocol     = Cid * Protocol
+type Command       = Loc * Cid * Op ;;
+type Slot_Num      = Int ;;
+type CommandTag    = NProtocol + Command ;;
+type Proposal      = Slot_Num * CommandTag;;
+type ReplicaState  = Slot_Num * Bool * CommandTag List * Proposal List * Protocol ;;
+
+variable k loc loc1 loc2   : Loc
+variable cid cid1 cid2     : Cid
+variable opr op1 op2       : Op
+variable s slt slt1 slt2   : Slot_Num
+variable p p1 p2           : Proposal
+variable np np1 np2        : NProtocol
+variable cmd cmd1 cmd2     : Command
+variable cmdt cmdt1 cmdt2  : CommandTag
+variable state             : ReplicaState
+
+
+(* ------ SOME LIBRARY FUNCTIONS ------ *)
+
+import map filter mapfilter bag-append bl-exists list_accum
+       quicksort-int null hd
+
+
+(* ------ INTERFACE  ------ *)
+
+input  request,     request       : Command             (* client              -> Replica   *)
+input  swap,        swap          : NProtocol           (* client              -> Replica   *)
+output pax_propose, pax_propose   : Proposal            (* Replica             -> Leader    *)
+output tt_propose,  tt_propose    : Proposal            (* Replica             -> Locations *)
+input  decision,    decision      : Proposal            (* Commander/Locations -> Replica   *)
+output response,    response      : Slot_Num * Cid * Op (* Replica             -> client    *)
+
+
+(* ------ INITIAL VALUES ------ *)
+
+let init_slot_num  : Slot_Num        = 1 ;;
+let init_active    : Bool            = false ;;
+let init_proposals : CommandTag List = [] ;;
+let init_decisions : Proposal List   = [] ;;
+let init_protocol  : Protocol        = ``2/3``;;
+let init_state     : ReplicaState    =
+   (init_slot_num,
+    init_active,
+    init_proposals,
+    init_decisions,
+    init_protocol) ;;
+
+
+(* ------ SOME USEFUL FUNCTIONS ------ *)
+
+let same_command (loc1,cid1,op1) (loc2,cid2,op2) = loc1 = loc2 & cid1 = cid2 ;;
+let same_command_tag cmdt1 cmdt2 =
+  case cmdt1
+    of inl np1 =>
+      (case cmdt2
+         of inl np2 => np1 = np2
+         of inr cmd2 => false)
+    of inr cmd1 =>
+      (case cmdt2
+         of inl np2 => false
+         of inr cmd2 => same_command cmd1 cmd2) ;;
+let diff_command_tag cmdt1 cmdt2 = !(same_command_tag cmdt1 cmdt2);;
+let greater_eq_proposal (slt1,cmdt1) (slt2,cmdt2) = slt1 >= slt2 & same_command_tag cmdt1 cmdt2 ;;
+
+let out_tr tr loc x (a,_) = tr x a ;;
+
+let iterate_tr (tr : 'i -> 's -> 's * 'r Bag) (init :'s) (ops : 'i List) : 's * 'r Bag =
+  list_accum (\ (a,b).\x. let (s',b') = tr x a in (s', bag-append b b'))
+             (init, {})
+             ops ;;
+
+
+(* ------ REPLICA ------ *)
+
+(* first_unoccupied ps = least positive integer that is *not* a member of ps *)
+let first_unoccupied ps =
+  list_accum (\a.\x. if x = a then a + 1 else a) 1 (quicksort-int ps) ;;
+
+let propose cmdt (slot_num,active,proposals,decisions,protocol) =
+  let proposals' =
+    if bl-exists ((map snd decisions) ++ proposals) (same_command_tag cmdt)
+    then proposals
+    else proposals ++ [cmdt] in
+  let msgs =
+    if active
+    then {}
+    else if protocol = ``paxos``
+    then pax_propose'broadcast ldrs (slot_num,cmdt)
+    else if protocol = ``2/3``
+    then tt_propose'broadcast locs (slot_num,cmdt)
+    else {} in
+  ((slot_num,true,proposals',decisions,protocol), msgs) ;;
+
+let propose_inl np state = propose (inl np) state;;
+let propose_inr cmd state = propose (inr cmd) state;;
+
+let perform cmdt slot_num protocol =
+  case cmdt
+    of inl (cid,new_protocol) => (slot_num + 1,new_protocol,{})
+    of inr (client,cid,opr) => (slot_num + 1,protocol,{response'send client (slot_num,cid,opr)})
+;;
+
+let on_slot_num_cmd cmdt (slot_num,active,proposals,decisions,protocol) =
+  let (slot_num',protocol',msgs) = perform cmdt slot_num protocol in
+  ((slot_num',false,proposals,decisions,protocol'),msgs) ;;
+
+let on_slot_num s (slot_num,active,proposals,decisions,protocol) =
+  if s = slot_num
+  then let ready = mapfilter snd (\(s,_).s = slot_num) decisions in
+         iterate_tr on_slot_num_cmd (slot_num,active,proposals,decisions,protocol) ready
+  else ((slot_num,active,proposals,decisions,protocol),{}) ;;
+
+let on_decision (s,cmdt) (slot_num,active,proposals,decisions,protocol) =
+  let decisions' =
+    if bl-exists decisions (greater_eq_proposal (slot_num,cmdt))
+    then decisions
+    else (s,cmdt) . decisions in
+  let proposals' = filter (diff_command_tag cmdt) proposals in
+  let lst = quicksort-int (map fst decisions') in
+  let ((slot_num1,active1,proposals1,decisions1,protocol1),msgs1) =
+    iterate_tr on_slot_num (slot_num,active,proposals',decisions',protocol) lst in
+  let (state,msgs2) =
+    if !(null proposals1)
+    then propose (hd proposals1) (slot_num1,active1,proposals1,decisions1,protocol1)
+    else ((slot_num1,active1,proposals1,decisions1,protocol1),{}) in
+  (state,bag-append msgs1 msgs2);;
+
+class ReplicaState =
+  State(\_.(init_state,{}),
+        out_tr propose_inl, swap'base,
+        out_tr propose_inr, request'base,
+        out_tr on_decision, decision'base) ;;
+
+class Replica = (\_.snd) o ReplicaState ;;
+
+main Replica @ reps

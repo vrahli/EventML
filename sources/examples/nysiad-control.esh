@@ -1,0 +1,53 @@
+(*../bin/eventml nysiad-control.esh --nuprl --lib alldefs.eml -o foo*)
+
+specification nysiad_control
+
+parameter replicas : Loc Bag
+parameter M, deqM  : Type * M Deq
+parameter flrs     : Int
+parameter clients  : Loc Bag
+parameter msg2m    : Msg -> M
+
+import type map-sig
+import int-deq id-deq mk-lookup-list-map
+
+include robust-simple-consensus-v4
+  where propose  = ``rsc4 propose``
+    and notify   = ``decision``
+    and type Cmd = Int
+    and cmdeq    = int-deq
+    and coeff    = 2
+    and flrs     = flrs
+    and locs     = replicas
+    and clients  = clients
+
+include OARcast
+  where orderers   = replicas
+    and receivers  = replicas
+    and senders    = replicas
+    and type M     = M
+    and deqM       = deqM
+    and flrs       = flrs
+    and oarcasthdr = ``oarcast``
+    and orderhdr   = ``OARcast order``
+    and orderedhdr = ``OARcast ordered``
+    and deliverhdr = ``deliver``
+
+include nysiad
+  where type M                  = M
+    and deqM                    = deqM
+    and OriginalProtocol        = rsc4_main
+    and actors                  = replicas
+    and senders                 = replicas
+    and msg2m                   = msg2m
+    and addwaitinghdr           = ``nysiad addwaiting``
+    and fromOARcasthdr          = ``deliver``
+    and deliverhdr              = ``nysiad deliver2OriginalProtocol``
+    and validator2queuehdr      = ``nysiad validator2queue``
+    and simulation2validatorhdr = ``nysiad simulation2validator``
+    and fromClienthdr           = ``fromClient``
+    and toOARcasthdr            = ``oarcast``
+    and toClienthdr             = ``toClient``
+    and waitingmap              = (mk-lookup-list-map (::Loc) M id-deq)
+
+main OARcast_main || nysiad_main

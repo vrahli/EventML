@@ -1,0 +1,31 @@
+%locations
+ acc1 : 127.0.0.1 8888
+ acc2 : 127.0.0.1 8889
+ acc3 : 127.0.0.1 8890
+ ldr1 : 127.0.0.1 8891
+ ldr2 : 127.0.0.1 8892
+and
+ rep1 : 127.0.0.1 8893
+ rep2 : 127.0.0.1 8894
+
+%parameters
+ accpts   : {LOC(acc1);LOC(acc2);LOC(acc3)}
+ reps     : {LOC(rep1);LOC(rep2)}
+ ldrs     : {LOC(ldr1);LOC(ldr2)}
+ ldrs_uid : \loc.if loc = LOC(ldr1) then 1 else 2
+ Cmd      : TYPE(Tok List)
+
+%messages
+ ldr1 : (``propose``, (Int * Tok List), (12,``foobar``))
+
+%databases
+ database1 : 127.0.0.1 14572
+ database2 : 127.0.0.1 14573
+ database3 : 127.0.0.1 14474
+ database4 : 127.0.0.1 14475
+
+%tobroadcast
+ tobcast1 : 127.0.0.1 15000
+ tobcast2 : 127.0.0.1 15001
+ tobcast3 : 127.0.0.1 15002
+ tobcast4 : 127.0.0.1 15003

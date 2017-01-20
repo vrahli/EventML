@@ -1,0 +1,177 @@
+(*******************************************************************)
+(* This is not typable because true is a Bool and 1 an Int *)
+let example1 = true - 1;;
+
+
+(*******************************************************************)
+(* This is typable *)
+let example2 =
+    Base (\m. let (hdr,ty,c) = m in
+    	      if hdd = ["paxos"; "input"]
+	         and
+		 ty = CMD
+	      then [c]
+	      else []);;
+
+
+(*******************************************************************)
+(* Unparsable *)
+let example3 = let foo = true - 1;;
+
+
+(*******************************************************************)
+(* Untypable *)
+let example4 = \m. m : Int : Bool;;
+
+
+(*******************************************************************)
+(* Typable *)
+let example5 = let g x =  if true then x else x in g 1;;
+
+
+(*******************************************************************)
+(* Typable *)
+let example6 = (:Int, 3) : (T : Type) * T;;
+
+
+(*******************************************************************)
+(* Untypable *)
+let example7 = (:Int, true) : (T : Type) * T ;;
+
+
+(*******************************************************************)
+(* Untypable *)
+type Foo ;;
+type Bar ;;
+let example8 = let f x = x : Foo : Bar in () ;;
+
+
+(*******************************************************************)
+(* Typable *)
+let example9 = let [x; y; z] = [1; 1; 1] in (x, y) ;;
+
+
+(*******************************************************************)
+(* Untypable *)
+cons foo1 : Int -> 'a with 'a in {Int, Bool} ;;
+cons foo2 : 'a -> Int with 'a in {Unit, Msg} ;;
+
+let x = foo2 (foo1 1) ;;
+
+
+(*******************************************************************)
+(* Typable *)
+cons foo1 : Int -> 'a with 'a in {Int, Bool} ;;
+cons foo2 : 'a -> Int with 'a in {Unit, Int} ;;
+
+let x = foo2 (foo1 1) ;;
+
+
+(*******************************************************************)
+(* Typable *)
+cons map (x : 'a -> 'b; y : 'c) : 'd with ('c, 'd) in {('a List, 'b List), ('a Bag, 'b Bag)} ;;
+let _ = let foo f x = map f x in
+      	let x = \f. foo f [1] in
+      	let y = \f. foo f [1] in
+      	  () ;;
+
+
+(*******************************************************************)
+(* Untypable *)
+cons map (x : 'a -> 'b; y : 'c) : 'd with ('c, 'd) in {('a List, 'b List), ('a Bag, 'b Bag)} ;;
+let _ = let foo f x = map f x in
+      	let x = \f. foo f [1] in
+      	let y = \f. foo f {1} in
+      	  () ;;
+
+
+(*******************************************************************)
+(* Untypable *)
+cons map (x : 'a -> 'b; y : 'c) : 'd with ('c, 'd) in {('a List, 'b List), ('a Bag, 'b Bag)} ;;
+cons concat (x : 'a) : 'b with ('a, 'b) in {('c List List, 'c List), ('c Bag Bag, 'c Bag)} ;;
+let lifting2 x =
+    let g = \f. \abag. \bbag. concat (map (\f. map f bbag) (map f abag)) in
+    let _ = g (\x. 1) in
+      () ;;
+
+
+(*******************************************************************)
+(* Untypable *)
+cons v1 : 'a -> 'a with 'a in {Int, Bool, Loc} ;;
+cons v2 : 'a -> 'a with 'a in {Int, Bool, Msg} ;;
+
+let f g =
+  let (x1, x2) = (v1 g, v2 g) in
+    (x1 : Int, x2 : Bool) ;;
+
+
+(*******************************************************************)
+(* Untypable *)
+cons map    (x : 'a -> 'b; y : 'c) : 'd with ('c, 'd) in {('a List, 'b List), ('a Bag, 'b Bag)} ;;
+cons concat (x : 'a)               : 'b with ('a, 'b) in {('c List List, 'c List), ('c Bag Bag, 'c Bag)} ;;
+cons union  (x : 'a; y : 'a)       : 'a with 'a       in {'b List, 'b Bag} ;;
+
+let g = \f. \abag : 'a Bag. \bbag. concat (map (\f. map f bbag) (map f abag)) ;;
+let u = g (\x. 1)
+
+
+(*******************************************************************)
+(* Untypable *)
+cons map    (x : 'a -> 'b; y : 'c) : 'd with ('c, 'd) in {('a List, 'b List), ('a Bag, 'b Bag)} ;;
+cons concat (x : 'a)               : 'b with ('a, 'b) in {('c List List, 'c List), ('c Bag Bag, 'c Bag)} ;;
+cons union  (x : 'a; y : 'a)       : 'a with 'a       in {'b List, 'b Bag} ;;
+
+let g = \f. \abag : 'a Bag. \bbag. concat (map (\f. map f bbag) (map f abag)) ;;
+let u = g (\x. x) {} []
+
+
+(*******************************************************************)
+(* Untypable *)
+cons map    (x : 'a -> 'b; y : 'c) : 'd with ('c, 'd) in {('a List, 'b List), ('a Bag, 'b Bag)} ;;
+cons concat (x : 'a)               : 'b with ('a, 'b) in {('c List List, 'c List), ('c Bag Bag, 'c Bag)} ;;
+cons union  (x : 'a; y : 'a)       : 'a with 'a       in {'b List, 'b Bag} ;;
+
+let lifting2 x =
+    let g = \f. \abag. \bbag. concat (map (\f. map f bbag) (map f abag)) in
+    let _ = g (\x. 1) in
+      () ;;
+
+
+(*******************************************************************)
+(* Untypable *)
+(* That's an interesting example because, because of the type constructor
+ * clash between Int and Bool, we can't know the type of a, and therefore
+ * we can't really make a decision on which type of foo to pick, x is then
+ * still overloaded and we obtain an overloading error at top-level.
+ * This does not seem wrong, but we don't really want to see this error
+ * before solving the type constructor clash. *)
+constant foo (x : 'b) : 'b with 'b in {Int, Bool} ;;
+
+let f =
+   let (a : Int) = true in
+   let x = foo a in
+     if true then x else x ;;
+
+
+(*******************************************************************)
+(* Typable *)
+let f x = let h a b = x a b         in (* makes x a function that takes 2 args            *)
+          let g u = (u x, u (op =)) in (* makes x and = to have the same type             *)
+            x ;;                       (* makes the return type of f the same as x's type *)
+(* = is an equality decider.
+ * Does that makes x an equality decider?  My guess is not, it doesn't *)
+
+
+(*******************************************************************)
+(* Typable *)
+let app f x = f x ;;
+let domain = app (\x. x) ;;
+let in_domain = domain ;;
+
+
+(*******************************************************************)
+(* Typable *)
+constant length    : 'b -> Int with 'b in {'a List, 'a Bag} ;;
+constant singleton : 'a -> 'b  with 'b in {'a List, 'a Bag} ;;
+let f = length (singleton 0) ;;
+

@@ -1,0 +1,69 @@
+specification ler2
+
+(* ------ TYPE FUNCTIONS ------ *)
+type Epoch = Int
+
+(* ------ PARAMETERS ------ *)
+parameter nodes  : Loc Bag
+parameter client : Loc
+parameter uid    : Loc -> Int
+
+(* ------ IMPORTS ------ *)
+import imax
+
+import bag-inject
+let uid_inject = bag-inject ::Loc nodes ::Int uid;;
+
+(* ------ INTERFACE ------ *)
+(* To inform a node of its Epoch and ring successor *)
+input    config  : Epoch * Loc
+(* Location of the leader *)
+output   leader  : Epoch * Loc
+(* Start the leader election *)
+input    choose  : Epoch
+(* Propose a node as the leader of the ring *)
+internal propose : Epoch * Int
+
+(* ------ SPECIFICATION OF THE ALGORITHM ------ *)
+
+let new_conf loc (epoch, succ) (epoch', succ') =
+  if epoch > epoch' then (epoch, succ) else (epoch', succ');;
+class Nbr = State(\slf.(0,slf), new_conf, config'base);;
+
+class ProposeReply =
+  let F loc (epoch, succ) (epoch', ldr) =
+    if epoch = epoch'
+    then if ldr = uid loc
+         then {leader'send client (epoch, loc)}
+         else {propose'send succ (epoch, imax ldr (uid loc))}
+    else {}
+  in F o (Nbr,propose'base) ;;
+
+class ChooseReply =
+  let F loc (epoch, succ) epoch' =
+    if epoch = epoch'
+    then {propose'send succ (epoch, uid loc)}
+    else {}
+  in F o (Nbr,choose'base) ;;
+
+let consistent_confs = forall e1 e2: Event. forall nbr1 nbr2: Loc. forall epoch: Epoch.
+         config'base observes (epoch,nbr1) @ e1
+      => config'base observes (epoch,nbr2) @ e2
+      => location e1 = location e2
+      => nbr1 = nbr2 ;;
+
+import bag-member
+let valid_conf = forall e : Event. forall nbr : Loc. forall epoch : Epoch.
+         config'base observes (epoch,nbr) @ e
+      => epoch > 0  /\  bag-member ::Loc nbr nodes  /\  !(nbr = location e) ;;
+
+invariant pos_epochs on (epoch,nbr) in Nbr == epoch >= 0 ;;
+
+let safety = forall e1 e2 : Event.
+      	     forall leader1 leader2 : Loc.
+             forall epoch1 epoch2 : Epoch.
+         leader'base observes (epoch1, leader1) @ e1 /\ leader'base observes (epoch2, leader2) @ e2
+      => epoch1 = epoch2
+      => leader1 = leader2;;
+
+main (ProposeReply || ChooseReply) @ nodes

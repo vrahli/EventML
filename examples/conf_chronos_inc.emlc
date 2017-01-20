@@ -1,0 +1,41 @@
+%locations
+ acc1 : 127.0.0.1 8888
+ acc2 : 127.0.0.1 8889
+ acc3 : 127.0.0.1 8890
+ ldr1 : 127.0.0.1 8891
+ ldr2 : 127.0.0.1 8892
+ loc1 : 127.0.0.1 8893
+ loc2 : 127.0.0.1 8894
+ loc3 : 127.0.0.1 8895
+ loc4 : 127.0.0.1 8869
+ rep1 : 127.0.0.1 8870
+ rep2 : 127.0.0.1 8871
+and
+ client : 127.0.0.1 8875
+
+%parameters
+ reps     : {LOC(rep1);LOC(rep2)}
+ ldrs     : {LOC(ldr1);LOC(ldr2)}
+ accpts   : {LOC(acc1);LOC(acc2);LOC(acc3)}
+ locs     : {LOC(loc1);LOC(loc2);LOC(loc3);LOC(loc4)}
+ Cid      : TYPE(Int)
+ Op       : TYPE(Tok List)
+ eq_Cid   : DEQ(Int)
+ eq_Op    : DEQ(Tok List)
+ ldrs_uid : \loc.if loc = LOC(ldr1) then 1 else 2
+ flrs     : 1
+
+%messages
+ rep1 : (``request``, (Loc * (Int * Tok List)), (LOC(client), (12,``foobar``)))
+
+%databases
+ database1 : 127.0.0.1 14572
+ database2 : 127.0.0.1 14573
+ database3 : 127.0.0.1 14474
+ database4 : 127.0.0.1 14475
+
+%tobroadcast
+ tobcast1 : 127.0.0.1 15000
+ tobcast2 : 127.0.0.1 15001
+ tobcast3 : 127.0.0.1 15002
+ tobcast4 : 127.0.0.1 15003

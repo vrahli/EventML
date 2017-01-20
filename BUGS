@@ -1,0 +1,4 @@
+2011-09-05 Vincent Rahli  <rahli@cs.cornell.edu>
+
+In a session, Ctrl-up goes back to the beginning of the line, before
+the prompter, before bringing back the previous command.

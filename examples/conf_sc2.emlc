@@ -1,0 +1,30 @@
+%locations
+ l1 : 127.0.0.1 8888
+ l2 : 127.0.0.1 8889
+ l3 : 127.0.0.1 8890
+ l4 : 127.0.0.1 8891
+and
+ client1 : 127.0.0.1 8892
+ client2 : 127.0.0.1 8893
+ client3 : 127.0.0.1 8894
+ client4 : 127.0.0.1 8895
+
+%parameters
+ Cmd     : TYPE(Tok List)
+ cmdeq   : DEQ(Tok List)
+ coeff   : 2
+ flrs    : 1
+ locs    : {LOC(l1);LOC(l2);LOC(l3);LOC(l4)}
+ clients : {LOC(client1)}
+
+%databases
+ database1 : 127.0.0.1 14572
+ database2 : 127.0.0.1 14573
+ database3 : 127.0.0.1 14474
+ database4 : 127.0.0.1 14475
+
+%tobroadcast
+ tobcast1 : 127.0.0.1 15000
+ tobcast2 : 127.0.0.1 15001
+ tobcast3 : 127.0.0.1 15002
+ tobcast4 : 127.0.0.1 15003

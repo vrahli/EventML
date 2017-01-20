@@ -1,0 +1,176 @@
+# Copyright 2011 Cornell University
+# Copyright 2012 Cornell University
+#
+#
+# This file is part of EventML - a tool aiming at specifying
+# distributed protocols in an ML like language.  It is an interface
+# to the logic of events and is compiled into Nuprl.  It is written
+# by the NUPRL group of Cornell University, Ithaca, NY.
+#
+# EventML is a free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# EventML is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with EventML.  If not, see <http://www.gnu.org/licenses/>.
+#
+#  o Authors:     Vincent Rahli
+#  o Affiliation: Cornell University, NUPRL group
+#  o Date:        20 May 2011
+#  o File name:   Makefile
+#  o Description: Initial main Makefile for EventML.
+#
+
+
+SHELL      = /bin/bash
+SOURCESDIR = sources
+DOCDIR     = docs
+UIDIR      = ui
+BINDIR     = bin
+LIBDIR     = lib
+prefix     = @prefix@
+BINNAME    = eventml
+TOOLNAME   = eventml
+
+
+default: no-doc-no-ocaml
+
+help:
+	# you can:
+	#   - generate a mlton binary:     bin
+	#   - generate the documentation : doc
+	#   - clean the directory:         clean
+	#   - make all:                    all
+
+.PHONY: bin
+bin:
+	(cd ${SOURCESDIR}; make all-bin)
+
+mlton-bin:
+	(cd ${SOURCESDIR}; make mlton-bin)
+
+ocaml-bin:
+	(cd ${SOURCESDIR}; make ocaml)
+
+smlnj-bin:
+	(cd ${SOURCESDIR}; make smlnj-bin)
+
+emacs-ui:
+	(cd ${UIDIR}; make emacs-ui PREF="$(DESTDIR)@prefix@")
+
+.PHONY: lib
+lib:
+	(cd ${SOURCESDIR}; make lib)
+
+.PHONY: doc
+doc:
+	(cd ${DOCDIR}; make pdf)
+
+pdf:
+	(cd ${DOCDIR}; make pdf)
+
+local-clean:
+	rm -Rf autom4te.cache
+	rm -Rf config.status
+	rm -Rf config.log
+	rm -Rf configure
+	rm -Rf Makefile
+
+clean: local-clean
+	(cd ${SOURCESDIR}; make clean)
+	(cd ${DOCDIR};     make clean)
+	(cd ${UIDIR};      make clean)
+
+
+no-doc-no-ocaml: mlton-bin emacs-ui lib
+
+no-doc: bin emacs-ui lib
+
+all: no-doc doc
+
+install-eventml:
+	mkdir -p $(DESTDIR)@prefix@/bin/
+	cp ${BINDIR}/${BINNAME} $(DESTDIR)@prefix@/bin/${BINNAME}
+
+install-lib:
+	mkdir -p $(DESTDIR)@prefix@/lib/${TOOLNAME}/
+	cp ${LIBDIR}/alldefs      $(DESTDIR)@prefix@/lib/${TOOLNAME}/
+	cp ${LIBDIR}/alldefs.eml  $(DESTDIR)@prefix@/lib/${TOOLNAME}/
+
+
+install-ui:
+	if [ "$(prefix)" == "/usr/local" ]; then \
+		if [ -d "$(DESTDIR)/usr/share/emacs/site-lisp/site-start.d/" ]; then \
+			cp ${UIDIR}/eventml.el $(DESTDIR)/usr/share/emacs/site-lisp/site-start.d/ ;\
+		fi ;\
+		if [ -d "$(DESTDIR)/etc/emacs/site-start.d/" ]; then \
+			cp ${UIDIR}/eventml.el $(DESTDIR)/etc/emacs/site-start.d/50eventml.el ;\
+		fi \
+	else \
+		echo "You have changed the prefix from /usr/local. You must load the eventml.el by hand." ;\
+	fi
+
+	mkdir -p $(DESTDIR)@prefix@/share/emacs/site-lisp/${TOOLNAME}/
+	cp ${UIDIR}/eventml-mode.el  $(DESTDIR)@prefix@/share/emacs/site-lisp/${TOOLNAME}/
+	cp ${UIDIR}/eventml-main.el  $(DESTDIR)@prefix@/share/emacs/site-lisp/${TOOLNAME}/
+	cp ${UIDIR}/sml-tes-main.el $(DESTDIR)@prefix@/share/emacs/site-lisp/${TOOLNAME}/
+
+	mkdir -p $(DESTDIR)@prefix@/share/emacs/site-lisp/site-start.d/
+	cp ${UIDIR}/eventml.el $(DESTDIR)@prefix@/share/emacs/site-lisp/site-start.d/
+
+install-doc:
+	mkdir -p $(DESTDIR)@prefix@/doc/${TOOLNAME}
+	cp ${DOCDIR}/manual/esharp-language.pdf $(DESTDIR)@prefix@/doc/${TOOLNAME}/
+
+install-no-doc: install-eventml install-lib install-ui
+
+install-all: install-no-doc install-doc
+
+install: install-no-doc
+
+uninstall-eventml:
+	rm -f $(DESTDIR)@prefix@/bin/${TOOLNAME}
+
+uninstall-lib:
+	rm -f $(DESTDIR)@prefix@/lib/${TOOLNAME}/alldefs
+	rm -f $(DESTDIR)@prefix@/lib/${TOOLNAME}/alldefs.eml
+
+	if [ -e "$(DESTDIR)@prefix@/lib/${TOOLNAME}" ]; then \
+		rmdir --ignore-fail-on-non-empty $(DESTDIR)@prefix@/lib/${TOOLNAME} ;\
+	fi
+
+uninstall-ui:
+	rm -f $(DESTDIR)@prefix@/emacs/site-lisp/site-start.d/eventml.el
+
+	rm -f $(DESTDIR)@prefix@/share/emacs/site-lisp/${TOOLNAME}/eventml-mode.el
+	rm -f $(DESTDIR)@prefix@/share/emacs/site-lisp/${TOOLNAME}/eventml-main.el
+	rm -f $(DESTDIR)@prefix@/share/emacs/site-lisp/${TOOLNAME}/sml-tes-main.el
+
+	rm -f $(DESTDIR)@prefix@/share/emacs/site-lisp/site-start.d/eventml.el
+	rm -f $(DESTDIR)/usr/share/emacs/site-lisp/site-start.d/eventml.el
+	rm -f $(DESTDIR)/etc/emacs/site-start.d/50eventml.el
+
+	if [ -e "$(DESTDIR)@prefix@/share/${TOOLNAME}" ]; then \
+		rmdir --ignore-fail-on-non-empty $(DESTDIR)@prefix@/share/${TOOLNAME} ;\
+	fi
+	if [ -e "$(DESTDIR)@prefix@/share/emacs/site-lisp/site-start.d" ]; then \
+		rmdir --ignore-fail-on-non-empty $(DESTDIR)@prefix@/share/emacs/site-lisp/site-start.d ;\
+	fi
+	if [ -e "$(DESTDIR)@prefix@/share/emacs/site-lisp/${TOOLNAME}" ]; then \
+		rmdir --ignore-fail-on-non-empty $(DESTDIR)@prefix@/share/emacs/site-lisp/${TOOLNAME} ;\
+	fi
+
+uninstall-doc:
+	rm -f $(DESTDIR)@prefix@/doc/${TOOLNAME}/esharp-language.pdf
+
+	if [ -e "$(DESTDIR)@prefix@/doc/${TOOLNAME}" ]; then \
+		rmdir --ignore-fail-on-non-empty $(DESTDIR)@prefix@/doc/${TOOLNAME} ;\
+	fi
+
+uninstall: uninstall-eventml uninstall-lib uninstall-ui uninstall-doc

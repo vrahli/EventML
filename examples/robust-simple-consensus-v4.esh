@@ -1,0 +1,125 @@
+specification rsc4
+
+(* ------ PARAMETERS ------ *)
+
+(* consensus on commands of aribtrary type Cmd with equality decider *)
+parameter Cmd, cmdeq : Type * Cmd Deq
+
+parameter coeff   : Int
+parameter flrs    : Int     (* max number of failures                  *)
+parameter locs    : Loc Bag (* set of exactly (3 * flrs + 1) locations *)
+parameter clients : Loc Bag (* locations of the clients to be notified *)
+
+parameter notify  : Tok List
+parameter propose : Tok List
+
+(*
+allow flrs send omission failures
+allow flrs byzantine failures
+*)
+
+(* ------ CONSTANTS ------ *)
+import length poss-maj list-diff deq-member from-upto Memory1
+       int-list-member
+
+(* ------ TYPE FUNCTIONS ------ *)
+
+type Inning = Int
+type CmdNum = Int
+type CI     = CmdNum * Inning
+type CC     = CmdNum * Cmd
+type Vote   = (CI * Cmd) * Loc
+
+(* ------ INTERFACE ------ *)
+
+internal vote    : Vote
+internal retry   : CI * Cmd
+internal decided : CC
+output   notify,  notify  : CC
+input    propose, propose : CC
+
+(* ------ 2/3 majority consensus, aka "simple consensus" ------ *)
+
+variable sender  : Loc
+variable loc     : Loc
+variable loc'    : Loc
+variable cmds    : Cmd List
+variable locs    : Loc List
+variable ni      : CI
+variable ni'     : CI
+variable c       : Cmd
+variable n       : CmdNum
+variable m       : CmdNum
+variable i       : Inning
+variable vt      : Vote
+variable round   : Int
+variable max     : CmdNum
+variable missing : CmdNum List
+
+let roundout loc (((n,i),c),sender) (cmds,locs) =
+  if length cmds = coeff * flrs
+  then let (k,x) = poss-maj cmdeq (c.cmds) c in
+         if k = coeff * flrs + 1
+         then { decided'send loc (n, x) }
+         else { retry'send loc ((n,i+1), x) }
+  else {}
+;;
+
+let init x loc = x ;;
+
+let newvote ni ((ni',c),sender) (cmds,locs) =
+  ni = ni' & !(deq-member (op =) sender locs);;
+let addvote ((ni,c),sender) (cmds,locs) = (c.cmds, sender.locs);;
+let add_to_quorum ni loc vt state = if newvote ni vt state then addvote vt state else state;;
+let when_quorum ni loc vt state = if newvote ni vt state then roundout loc vt state else {} ;;
+
+class QuorumState ni = Memory1 (init (nil,nil)) (add_to_quorum ni) vote'base ;;
+class Quorum ni = (when_quorum ni) o (vote'base, QuorumState ni) ;;
+
+class Round (ni,c) = Output(\loc.vote'broadcast locs ((ni,c),loc))
+                  || Once(Quorum ni) ;;
+
+let vote2retry loc ((ni,c),sender) = {(ni,c)};;
+let RoundInfo = retry'base || (vote2retry o vote'base);;
+
+let update_round n loc ((m,i),c) round = if n = m & round < i then i else round ;;
+let when_new_round n loc ((m,i),c) round = if n = m & round < i then {((m,i),c)} else {} ;;
+
+class NewRoundsState n = Memory1 (init 0) (update_round n) RoundInfo ;;
+class NewRounds n = (when_new_round n) o (RoundInfo, NewRoundsState n) ;;
+
+progress rounds_strict_inc on round1 then round2 in NewRoundsState n
+  with ((n',round'),cmd) in RoundInfo
+   and condition (round). n' = n /\ round < round'
+  == round1 < round2 ;;
+
+let decision n loc (m,c) = if m = n then notify'broadcast clients (m,c) else {};;
+
+class Notify n = Once((decision n) o decided'base);;
+
+class Voter (n,c) = Round ((n,0),c)
+                 || (Notify n)
+                 || ((NewRounds n >>= Round) until (Notify n));;
+
+let onnewpropose (n,c) (max, missing) =
+  if n > max
+  then (n, missing ++ (from-upto (max + 1) n))
+  else (max, list-diff (op =) missing [n])
+;;
+
+let vote2prop loc (((n,i),c),loc') = {(n,c)} ;;
+class Proposal = propose'base || (vote2prop o vote'base);;
+
+let update_replica loc (n,c) (max,missing) =
+  if n > max or deq-member (op =) n missing
+  then onnewpropose (n,c) (max,missing)
+  else (max,missing) ;;
+let when_new_proposal loc (n,c) (max,missing) =
+  if n > max or deq-member (op =) n missing then {(n,c)} else {} ;;
+
+class ReplicaState = Memory1 (init (0,nil)) update_replica Proposal ;;
+class NewVoters = when_new_proposal o (Proposal, ReplicaState) ;;
+
+class Replica = NewVoters >>= Voter;;
+
+main Replica @ locs

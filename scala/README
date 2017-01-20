@@ -1,0 +1,26 @@
+------ How to test Aneris?
+
+You'll need: scala, gnome-terminal, wmctrl
+
+
+o To compile Aneris, type
+
+    make aneris
+    make client
+
+o First, start aneris by typing
+
+    ./start aneris
+
+  in a terminal.
+
+  You'll see a few windows popup, that's the various Aneris processes.
+
+o Then, start a client by typing
+
+    make r-client
+
+  in a terminal.  This is going to run in your terminal and not pop up
+  a new window.
+
+o The client is going to ask "sending?", type "y" for "yes".

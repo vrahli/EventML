@@ -1,0 +1,62 @@
+specification ler
+
+
+(* ------ PARAMETERS ------ *)
+
+parameter nodes  : Loc Bag
+parameter client : Loc
+parameter uid    : Loc -> Int
+
+
+(* ------ IMPORTS ------ *)
+
+import imax
+
+
+(* ------ TYPE FUNCTIONS ------ *)
+
+type Epoch = Int
+
+(* A state is a pair epoch/successor
+ * (uid of the successor's location).
+ *)
+
+
+(* ------ MESSAGES ------ *)
+
+(* To inform a node of its Epoch and ring successor *)
+input    config  : Epoch * Loc
+(* Location of the leader *)
+output   leader  : Epoch * Loc
+(* Start the leader election *)
+input    choose  : Epoch
+(* Propose a node as the leader of the ring *)
+internal propose : Epoch * Int
+
+
+(* ------ SPECIFICATION OF THE ALGORITHM ------ *)
+
+class Nbr =
+  let f _ (epoch, succ) (epoch', succ') =
+    if epoch > epoch'
+    then (epoch, succ)
+    else (epoch', succ') in
+  State(\slf.(0,slf),f,config'base) ;;
+
+class ProposeReply =
+  let F loc (epoch, succ) (epoch', ldr) =
+    if epoch = epoch'
+    then if ldr = uid loc
+         then {leader'send client (epoch, loc)}
+         else {propose'send succ (epoch, imax ldr (uid loc))}
+    else {}
+  in F o (Nbr,propose'base) ;;
+
+class ChooseReply =
+  let F loc (epoch, succ) epoch' =
+    if epoch = epoch'
+    then {propose'send succ (epoch, uid loc)}
+    else {}
+  in F o (Nbr,choose'base) ;;
+
+main (ProposeReply || ChooseReply)  @ nodes

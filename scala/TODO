@@ -1,0 +1,5 @@
+o Raise the type constraints we generate when converting Nuprl's
+library to Scala code.
+
+o Generate recursive function from Nuprl recursive functions instead
+of using fix.

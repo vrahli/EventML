@@ -1,0 +1,106 @@
+2012-11-26  Vincent Rahli  <rahli@cs.cornell.edu>
+
+	* Version: Release of version 0.4.
+
+	* Improvement: New SML evaluator: ev2e.
+
+	* Improvement: Improved SML and OCaml evaluators.
+
+2012-09-20  Vincent Rahli  <rahli@cs.cornell.edu>
+
+	* Version: Release of version 0.3.
+
+	* New_feature: EML can now generate our new processes as well as
+	the old ones.  The new processes are much faster.
+
+	* New_feature: The Nuprl library can either be kept and terms are
+	not unfolded before evaluation, or the Nuprl library can be GC
+	once the terms have been totally unfolded.  The issue is that the
+	library takes a lot of space in memory, so one does not always
+	wants to keep it around (a completely unfolded term is often
+	lighter).
+
+	* New_feature: We have implemented an OCaml evaluator.
+
+	* New_feature: We have changed the syntax of configuration files.
+	Connections can now be specified in these files.  Before we were
+	forcing each component to be connected to all the other components
+	of the system.
+
+	* New_feature: Headers can now be parametrized.
+
+	* New_feature: Specifications can now include other
+	specifications.
+
+2012-05-04  Vincent Rahli  <rahli@cs.cornell.edu>
+
+	* Discarded_feature: One cannot use 'outl' and 'outr' anymore, but
+	instead use 'case' (do pattern matching).
+
+	* New_feature: We have built a message system to run the
+	synthesized protocols in a real environment.
+
+	* New_feature: We have extended the syntax so that one can write
+	various propositions (using /\, \/, forall, exists, not, =>).
+
+2012-02-03  Vincent Rahli  <rahli@cs.cornell.edu>
+
+	* New_feature: In a session, one can turn off the type checker by
+	typing 'notype'.
+
+	* New_feature: 'fix', 'outl', 'outr' are now builtin.  'fix' is
+	just Nuprl's 'ycomb_fix' function.
+
+2011-11-07  Vincent Rahli  <rahli@cs.cornell.edu>
+
+	* New_feature: One can write simple class invariants as follows:
+	invariant invariant_name (class_name, function).
+
+	* New_feature: One can write comments that will be imported into
+	Nuprl.  These invariants should be placed just before a
+	declaration and be of the form (** ... *).
+
+	* Version: Release of version 0.2.
+
+2011-10-28  Vincent Rahli  <rahli@cs.cornell.edu>
+
+	* New_feature: We generate programs from specifications outside
+	Nuprl, and we have a simulator to simulate these programs running.
+
+2011-09-05  Vincent Rahli  <rahli@cs.cornell.edu>
+
+	* New_feature: The Emacs UI allows one to access to (import) some
+	Nuprl terms (those for which we can compute an EML type).
+
+	* New_feature: We generate a nlp (normal locally programmable)
+	lemma for each class of a specification.  The program can then be
+	extracted from the main programmability lemma.
+
+	* Improvement: We have changed many of the file names that were
+	containing the string "esharp" so that they now contain the string
+	"eventml".  The main binary is now also called eventml instead of
+	esharp.
+
+	* Improvement: We wrote a README file explaining how to run
+	EventML.  The INSTALL file contains more information on the
+	installation process.
+
+	* Bug: The types we compute from Nuprl to EML are approximations.
+	For example, we discard the conditions in set types.  This can
+	lead to the assumption that functions are total on some type when
+	in fact they are partial (because of the restriction imposed by a
+	set type).
+
+2011-04-27  Vincent Rahli  <rahli@cs.cornell.edu>
+
+	* Version: EventML version 0.1
+
+	* Note: this is the first entry in the ChangeLog but we have
+	actually started the project on 2011-02-23.
+
+	* Description_of_the_current_content: currently we have an EventML
+	parser, a constraint-based EventML type inferencer, and we can
+	export the EventML code into NuPrl.  We Also have an Emacs UI and
+	some outdated documentation.  The source code is written in SML
+	and we use MLton to generate binaries.  We also have various
+	implementations of Paxos.

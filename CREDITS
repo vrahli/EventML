@@ -1,0 +1,12 @@
+EventML is an interface to the Logic of Events aiming at easing the
+specification of concurrent systems' behavior.  It has an ML-like
+syntax and is implemented in SML.
+
+The list of people involved in this project is as follows:
+
+  - Mark Bickford
+  - Robert L. Constable
+  - Richard Eaton
+  - David Guaspari
+  - Christoph Kreitz
+  - Vincent Rahli

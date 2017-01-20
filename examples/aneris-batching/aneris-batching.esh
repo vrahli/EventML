@@ -1,0 +1,314 @@
+specification aneris_batch
+options mono newprog
+
+
+(* ------ PARAMETERS ------ *)
+
+parameter Op : Type
+
+parameter reps      : Loc Bag
+parameter pax_procs : Loc Bag
+parameter tt_procs  : Loc Bag
+parameter clients   : Loc Bag
+
+parameter timeout : Int
+
+parameter bcast       : Tok List
+parameter swap        : Tok List
+parameter pax_propose : Tok List
+parameter tt_propose  : Tok List
+parameter decision    : Tok List
+parameter response    : Tok List
+parameter timer       : Tok List
+
+
+(* ------ TYPE FUNCTIONS USED BY PAXOS ------ *)
+
+type Cid           = Int
+type Protocol      = Tok List
+type NProtocol     = Cid * Protocol
+type Command       = Cid * Op
+type Slot_Num      = Int
+type CommandTag    = NProtocol + Command
+type CommandsTag   = NProtocol + Command List
+type Proposal      = Slot_Num * CommandTag
+type Proposals     = Slot_Num * CommandsTag
+type ReplicaState  =
+  Slot_Num
+  * Bool
+  * Bool
+  * CommandTag List
+  * Proposal List
+  * Proposals List * Protocol
+
+variable k loc loc1 loc2   : Loc
+variable cid cid1 cid2     : Cid
+variable opr op1 op2       : Op
+variable s slt slt1 slt2   : Slot_Num
+variable p p1 p2 prp       : Proposal
+variable np np1 np2        : NProtocol
+variable cmd cmd1 cmd2     : Command
+variable cmdt cmdt1 cmdt2  : CommandTag
+variable cmdts             : CommandsTag
+variable prps              : Proposals
+variable state             : ReplicaState
+
+
+(* ------ SOME LIBRARY FUNCTIONS ------ *)
+
+import type comparison
+
+import bag-append list_accum null last bl-exists hd tl
+       list_ind outl outr
+       reduce insert-combine remove-combine
+       int-minus-comparison int-minus-comparison-inc
+
+
+(* ------ INTERFACE  ------ *)
+
+input  bcast,       bcast       : Command   (* client              -> Replica   *)
+input  swap,        swap        : NProtocol (* client              -> Replica   *)
+output pax_propose, pax_propose : Proposals (* Replica             -> Leader    *)
+output tt_propose,  tt_propose  : Proposals (* Replica             -> Locations *)
+input  decision,    decision    : Proposals (* Commander/Locations -> Replica   *)
+output response,    response    : Proposals (* Replica             -> client    *)
+internal timer,     timer       : Unit
+
+(*
+(* debug *)
+output prpa : CommandTag List
+output prpb : CommandTag List
+output prpc : CommandsTag
+*)
+
+
+(* ------ INITIAL VALUES ------ *)
+
+let init_slot_num  : Slot_Num        = 1 ;;
+let init_active    : Bool            = false ;;
+let init_atimer    : Bool            = false ;;
+let init_proposals : CommandTag List = [] ;;
+let init_decisions : Proposal List   = [] ;;
+let init_todo      : Proposals List  = [] ;;
+let init_protocol  : Protocol        = ``paxos``;;
+
+
+(* - All the decisions in 'decisions' have a slot number < slot_num
+ * they are the decisions we've already dealt with (meaning that
+ * we've responded to the clients that these commands have been
+ * accepted).
+ * - The decisions in 'todo' are the ones we still have to deal with.
+ * - The proposals in 'proposals' are the proposals we've received
+ * but haven't sent to consensus yet. *)
+let init_state : ReplicaState    =
+   (init_slot_num,
+    init_active,
+    init_atimer,
+    init_proposals,
+    init_decisions,
+    init_todo,
+    init_protocol) ;;
+
+(* proposals are ordered as follows in a decreasing order w.r.t. the cid numbers.
+ * decisions are ordered in a decreasing order w.r.t. the cid numbers.
+ * todo are also ordered in a decreasing order but w.r.t. the slot numbers.
+ *)
+
+
+(* ------ SOME USEFUL FUNCTIONS ------ *)
+
+let command_tag2cid cmdt =
+  case cmdt of inl(cid,x) => cid
+            of inr(cid,x) => cid ;;
+
+let command2num  (cid,_) = 2 * cid ;;
+let protocol2num (cid,_) = (2 * cid) + 1 ;;
+
+let command_tag2num cmdt =
+  case cmdt of inl np => protocol2num np
+            of inr cmd => command2num cmd ;;
+
+let proposal2num (slt,cmdt) = command_tag2num cmdt ;;
+
+let dest_decision (slt,cmdt) = (slt,command_tag2cid cmdt);;
+let dec2slt (slt,_) = slt ;;
+
+let out_tr tr loc x (a,_) = tr loc x a ;;
+
+let iterate_tr (tr : 'i -> 's -> 's * 'r Bag) (init :'s) (ops : 'i List) : 's * 'r Bag =
+  list_accum (\ (a,b).\x. let (s',b') = tr x a in (s', bag-append b b'))
+             (init, {})
+             ops ;;
+
+
+(* ------ REPLICA ------ *)
+
+let is_decision cmdt decisions =
+  let n = command_tag2num cmdt in
+  reduce
+    (\prp.\r. let n' = proposal2num prp in
+         if n > n' then false
+         else n = n' or r)
+    false decisions ;;
+
+let is_todo cmdt todo =
+  let n = command_tag2num cmdt in
+  bl-exists
+    todo
+    (\(slt,cmdts).
+        if isl cmdts then
+          n = protocol2num (outl cmdts)
+        else bl-exists (outr cmdts) (\cmd.n = command2num cmd)) ;;
+
+(* if command_tag2cid cmdt < cid then we stop because proposals are
+ * in a decreasing order. *)
+let filter_out_proposal cmdt proposals =
+  let cid = command_tag2cid cmdt in
+  remove-combine (\cmdt.cid - command_tag2cid cmdt) proposals ;;
+
+let filter_out_proposals cmdts proposals =
+  if isl cmdts then
+    filter_out_proposal (inl (outl cmdts)) proposals
+  else reduce
+         (\cmd.\proposals.filter_out_proposal (inr cmd) proposals)
+         proposals
+         (outr cmdts) ;;
+
+(* int-minus-comparison is \x y. f x - f y
+ * Therefore, because proposals is ordered in a decreasing order,
+ * we stop when the test is 0 <= _.  *)
+let add_proposal_if_not_in cmdt proposals =
+  insert-combine (* proposals is ordered in a decreasing order *)
+    (int-minus-comparison command_tag2num)
+    (\prp1.\prp2.prp2) (* we don't replace the old proposal if we get it again *)
+    cmdt
+    proposals ;;
+
+let add_decision slt cmdt decisions =
+  insert-combine (* decision is ordered in a decreasing order *)
+    (int-minus-comparison proposal2num)
+    (\prp1.\prp2.prp2)
+    (slt,cmdt)
+    decisions ;;
+
+let add_decisions slt cmdts decisions =
+  if isl cmdts
+  then add_decision slt (inl (outl cmdts)) decisions
+  else reduce
+         (\cmd.\decisions.add_decision slt (inr cmd) decisions)
+         decisions
+         (outr cmdts) ;;
+
+(* is decided if one of them or all of them are decided (it should not matter) *)
+let is_decided cmdts decisions =
+  if isl cmdts
+  then is_decision (inl (outl cmdts)) decisions
+  else reduce
+         (\cmd.\b.if is_decision (inr cmd) decisions then b else false)
+         true
+         (outr cmdts) ;;
+
+let add_todo slot_num slt cmdts decisions todo =
+  if slt < slot_num or is_decided cmdts decisions
+  then todo
+  else insert-combine (* todo is ordered in an increasing order *)
+         (int-minus-comparison-inc dec2slt)
+         (\prps1.\prps2.prps2)
+         (slt,cmdts)
+         todo ;;
+
+let filter_out_todo slt todo = remove-combine (\x.dec2slt x - slt) todo ;;
+
+let get_batch_prps proposals decisions =
+  let h = hd proposals in
+  if isl h then (inl (outl h), tl proposals)
+  else
+    let (cmds,proposals') =
+      list_ind
+        proposals
+        ([], [])
+        (\cmdt.\r.\(bat,proposals).
+            if isl cmdt then ([],cmdt.r)
+            else ((outr cmdt).bat,proposals))
+    in (inr cmds,proposals') ;;
+
+let get_batch proposals decisions =
+  let h = hd proposals in
+  if isl h then inl (outl h)
+  else
+    let cmds =
+      list_ind proposals []
+        (\cmdt.\r.\bat.
+            if isl cmdt then []
+            else (outr cmdt).bat)
+    in inr cmds ;;
+
+let propose (slot_num,active,atimer,proposals,decisions,todo,protocol) =
+  if null proposals then
+    ((slot_num,active,atimer,proposals,decisions,todo,protocol), {})
+  else
+  let msgs =
+    if active then {}
+    else if protocol = ``paxos`` then
+      let batch = get_batch proposals decisions in
+      pax_propose'broadcast pax_procs (slot_num,batch)
+    else if protocol = ``2/3`` then
+      let batch = get_batch proposals decisions in
+      tt_propose'broadcast tt_procs (slot_num,batch)
+    else {} in
+  ((slot_num,true,atimer,proposals,decisions,todo,protocol), msgs) ;;
+
+let propose_inj loc cmdt (slot_num,active,atimer,proposals,decisions,todo,protocol) =
+  if is_decision cmdt decisions or is_todo cmdt todo
+  (* TODO: why was 'active' set to true?  That should be 'active' right?  We don't do anything  *)
+  then ((slot_num,active,atimer,proposals,decisions,todo,protocol), {(*done'send loc ()*)})
+  else let proposals' = add_proposal_if_not_in cmdt proposals in
+       let (msgs,atimer') =
+         if active then ({(*isactive'send loc ()*)},atimer)
+         else if atimer then ({(*istimer'send loc ()*)},atimer)
+         else ({timer''send timeout loc ()},true) in
+       ((slot_num,active,atimer',proposals',decisions,todo,protocol),msgs);;
+
+let propose_inl loc np  state = propose_inj loc (inl np)  state ;;
+let propose_inr loc cmd state = propose_inj loc (inr cmd) state ;;
+
+let propose_bat loc () state =
+  let ((slot_num,active,atimer,proposals,decisions,todo,protocol),msgs) = propose state
+  in ((slot_num,active,false,proposals,decisions,todo,protocol),msgs) ;;
+
+let perform cmdts slot_num protocol =
+  let protocol' = case cmdts of inl (cid,new_protocol) => new_protocol
+                             of inr cmds => protocol
+  in (protocol',response'broadcast clients (slot_num,cmdts)) ;;
+
+let on_slot_num_cmd cmdts (slot_num,active,atimer,proposals,decisions,todo,protocol) =
+  let todo' = filter_out_todo slot_num todo in
+  if is_decided cmdts decisions
+  then ((slot_num,active,atimer,proposals,decisions,todo',protocol),{})
+  else let (protocol',msgs) = perform cmdts slot_num protocol in
+       let decisions' = add_decisions slot_num cmdts decisions in
+       ((slot_num + 1,false,atimer,proposals,decisions',todo',protocol'),msgs) ;;
+
+let on_slot_num (slt,cmdts) (slot_num,active,atimer,proposals,decisions,todo,protocol) =
+  if slt = slot_num
+  then on_slot_num_cmd cmdts (slot_num,active,atimer,proposals,decisions,todo,protocol)
+  else ((slot_num,active,atimer,proposals,decisions,todo,protocol),{}) ;;
+
+let on_decision loc (slt,cmdts) (slot_num,active,atimer,proposals,decisions,todo,protocol) =
+  let todo' = add_todo slot_num slt cmdts decisions todo in
+  let proposals' = filter_out_proposals cmdts proposals in
+  let ((slot_num1,active1,atimer1,proposals1,decisions1,todo1,protocol1),msgs1) =
+    iterate_tr on_slot_num (slot_num,active,atimer,proposals',decisions,todo',protocol) todo' in
+  let (state,msgs2) = propose (slot_num1,active1,atimer1,proposals1,decisions1,todo1,protocol1) in
+  (state, bag-append msgs1 msgs2);;
+
+class ReplicaState =
+  State(\_.(init_state,{}),
+        out_tr propose_inl, swap'base,
+        out_tr propose_inr, bcast'base,
+        out_tr propose_bat, timer'base,
+        out_tr on_decision, decision'base) ;;
+
+class Replica = (\_.snd) o ReplicaState ;;
+
+main Replica @ reps

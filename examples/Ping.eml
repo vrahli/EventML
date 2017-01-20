@@ -1,0 +1,24 @@
+specification ping_pong
+
+import bag-map
+
+parameter p    : Loc
+parameter locs : Loc Bag
+
+input    start : Loc
+internal ping  : Loc
+internal pong  : Loc
+output   out   : Loc
+
+class ReplyToPong (client,loc) =
+  (\_.\l.if l = loc then {out'send client l} else {}) o pong'base ;;
+
+class SendPing (client,loc) = Output(\l.{ping'send loc l}) ;;
+class Handler p = SendPing p || ReplyToPong p ;;
+
+class Subs = (\_.\client.bag-map (\l.(client,l)) locs) o start'base;;
+class P = Subs >>= Handler;;
+
+class ReplyToPing = (\loc.\l.{pong'send l loc}) o ping'base ;;
+
+main P @ {p} || ReplyToPing @ locs
